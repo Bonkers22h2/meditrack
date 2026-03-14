@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:meditrack/pages/dashboard.dart';
 
 void main() {
   runApp(const MeditrackApp());
@@ -22,8 +23,23 @@ class MeditrackApp extends StatelessWidget {
   }
 }
 
-class MeditrackLoginScreen extends StatelessWidget {
+class MeditrackLoginScreen extends StatefulWidget {
   const MeditrackLoginScreen({super.key});
+
+  @override
+  State<MeditrackLoginScreen> createState() => _MeditrackLoginScreenState();
+}
+
+class _MeditrackLoginScreenState extends State<MeditrackLoginScreen> {
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
 
   // Custom Colors extracted from the image
   final Color backgroundColor = const Color(0xFFF4F5F0);
@@ -33,6 +49,26 @@ class MeditrackLoginScreen extends StatelessWidget {
   final Color iconGreenColor = const Color(0xFF87A884);
   final Color textDark = const Color(0xFF1A1A1A);
   final Color textLight = const Color(0xFF9E9E9E);
+
+  void _handleLogin() {
+    final String email = _emailController.text.trim();
+    final String password = _passwordController.text.trim();
+
+    if (email == 'user' && password == 'user') {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute<void>(
+          builder: (BuildContext context) => const DashboardScreen(),
+        ),
+      );
+      return;
+    }
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(content: Text('Invalid email or password')),
+      );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -56,7 +92,7 @@ class MeditrackLoginScreen extends StatelessWidget {
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.03),
+                        color: Colors.black.withValues(alpha: 0.03),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       ),
@@ -106,7 +142,7 @@ class MeditrackLoginScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(24),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
+                        color: Colors.black.withValues(alpha: 0.04),
                         blurRadius: 20,
                         offset: const Offset(0, 10),
                       ),
@@ -126,7 +162,10 @@ class MeditrackLoginScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
                       // Email TextField
-                      _buildTextField(obscureText: false),
+                      _buildTextField(
+                        obscureText: false,
+                        controller: _emailController,
+                      ),
 
                       const SizedBox(height: 20),
 
@@ -141,7 +180,10 @@ class MeditrackLoginScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
                       // Password TextField
-                      _buildTextField(obscureText: true),
+                      _buildTextField(
+                        obscureText: true,
+                        controller: _passwordController,
+                      ),
 
                       const SizedBox(height: 16),
 
@@ -168,9 +210,7 @@ class MeditrackLoginScreen extends StatelessWidget {
                   width: double.infinity,
                   height: 56,
                   child: ElevatedButton(
-                    onPressed: () {
-                      // Add login logic here
-                    },
+                    onPressed: _handleLogin,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: buttonColor,
                       foregroundColor: Colors.white,
@@ -206,9 +246,13 @@ class MeditrackLoginScreen extends StatelessWidget {
   }
 
   // Helper method to build the rounded, filled text fields
-  Widget _buildTextField({required bool obscureText}) {
+  Widget _buildTextField({
+    required bool obscureText,
+    required TextEditingController controller,
+  }) {
     return TextField(
       obscureText: obscureText,
+      controller: controller,
       decoration: InputDecoration(
         filled: true,
         fillColor: textFieldColor,
