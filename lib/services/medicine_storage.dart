@@ -10,6 +10,8 @@ class MedicineRecord {
     required this.doseAmount,
     required this.frequency,
     this.specificTime,
+    this.reminderStartDate,
+    this.reminderEndDate,
     this.currentStock,
     this.alarmStock,
     this.expirationDate,
@@ -22,6 +24,8 @@ class MedicineRecord {
   final String doseAmount;
   final String frequency;
   final DateTime? specificTime;
+  final DateTime? reminderStartDate;
+  final DateTime? reminderEndDate;
   final int? currentStock;
   final int? alarmStock;
   final DateTime? expirationDate;
@@ -35,6 +39,10 @@ class MedicineRecord {
       doseAmount: (json['doseAmount'] as String?) ?? '',
       frequency: (json['frequency'] as String?) ?? '',
       specificTime: _tryParseDateTime(json['specificTime'] as String?),
+      reminderStartDate: _tryParseDateTime(
+        json['reminderStartDate'] as String?,
+      ),
+      reminderEndDate: _tryParseDateTime(json['reminderEndDate'] as String?),
       currentStock: json['currentStock'] as int?,
       alarmStock: json['alarmStock'] as int?,
       expirationDate: _tryParseDateTime(json['expirationDate'] as String?),
@@ -51,6 +59,8 @@ class MedicineRecord {
       'doseAmount': doseAmount,
       'frequency': frequency,
       'specificTime': specificTime?.toIso8601String(),
+      'reminderStartDate': reminderStartDate?.toIso8601String(),
+      'reminderEndDate': reminderEndDate?.toIso8601String(),
       'currentStock': currentStock,
       'alarmStock': alarmStock,
       'expirationDate': expirationDate?.toIso8601String(),

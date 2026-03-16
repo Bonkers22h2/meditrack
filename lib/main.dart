@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:meditrack/pages/dashboard.dart';
+import 'package:meditrack/services/notification_service.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await NotificationService.initialize();
   runApp(const MeditrackApp());
 }
 

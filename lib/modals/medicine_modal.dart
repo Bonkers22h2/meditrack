@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:meditrack/services/notification_service.dart';
 import 'package:meditrack/services/medicine_storage.dart';
 
 class MedicineModal extends StatefulWidget {
@@ -23,9 +24,14 @@ class _MedicineModalState extends State<MedicineModal> {
   final TextEditingController _currentStockController = TextEditingController();
   final TextEditingController _alarmStockController = TextEditingController();
 
-  DateTime? _specificDateTime;
+  DateTime? _reminderStartDate;
+  DateTime? _reminderEndDate;
+  TimeOfDay? _reminderTime;
   DateTime? _expirationDate;
   bool _isSaving = false;
+  bool? _notificationsEnabled;
+  bool _isCheckingNotificationStatus = true;
+  bool _isSendingTestNotification = false;
 
   // Custom colors matching your new design
   final Color modalBgColor = const Color(0xFFC0D1BD);
@@ -35,6 +41,12 @@ class _MedicineModalState extends State<MedicineModal> {
   final Color saveBtnColor = const Color(0xFF3B5E3C);
   final Color textDark = const Color(0xFF1A1A1A);
   final Color textHint = const Color(0xFFC5C5C5);
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshNotificationStatus();
+  }
 
   @override
   void dispose() {
@@ -148,7 +160,8 @@ class _MedicineModalState extends State<MedicineModal> {
                         hint: 'Daily..',
                         controller: _frequencyController,
                       ),
-                      _buildSpecificTimeGroup('Specific Time'),
+                      _buildReminderRangeGroup(),
+                      _buildNotificationTestCard(),
                     ],
                     const SizedBox(height: 12),
 
@@ -176,10 +189,7 @@ class _MedicineModalState extends State<MedicineModal> {
                         controller: _alarmStockController,
                         keyboardType: TextInputType.number,
                       ),
-                      _buildSpecificTimeGroup(
-                        'Expiration Date',
-                        isDateOnly: true,
-                      ),
+                      _buildExpirationDateGroup(),
                     ],
                     const SizedBox(height: 24),
                   ],
@@ -254,6 +264,140 @@ class _MedicineModalState extends State<MedicineModal> {
         ),
       ),
     );
+  }
+
+  Widget _buildNotificationTestCard() {
+    final String statusText;
+    if (_isCheckingNotificationStatus) {
+      statusText = 'Checking notification permission...';
+    } else if (_notificationsEnabled == true) {
+      statusText = 'Notifications: Enabled';
+    } else {
+      statusText = 'Notifications: Disabled';
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16.0),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: inputBgColor,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    statusText,
+                    style: TextStyle(fontSize: 13, color: textDark),
+                  ),
+                ),
+                TextButton(
+                  onPressed: _isCheckingNotificationStatus
+                      ? null
+                      : _refreshNotificationStatus,
+                  child: const Text('Refresh'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _isSendingTestNotification
+                        ? null
+                        : _sendInstantTestNotification,
+                    child: const Text('Test now'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _isSendingTestNotification
+                        ? null
+                        : _sendDelayedTestNotification,
+                    child: const Text('Test in 10s'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _refreshNotificationStatus() async {
+    setState(() {
+      _isCheckingNotificationStatus = true;
+    });
+
+    bool enabled = true;
+    try {
+      enabled = await NotificationService.areNotificationsEnabled();
+    } catch (_) {
+      enabled = false;
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _notificationsEnabled = enabled;
+      _isCheckingNotificationStatus = false;
+    });
+  }
+
+  Future<void> _sendInstantTestNotification() async {
+    await _sendTestNotification(delayedSeconds: 0);
+  }
+
+  Future<void> _sendDelayedTestNotification() async {
+    await _sendTestNotification(delayedSeconds: 10);
+  }
+
+  Future<void> _sendTestNotification({required int delayedSeconds}) async {
+    setState(() {
+      _isSendingTestNotification = true;
+    });
+
+    final int notificationId = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    final String medicineName = _nameController.text.trim().isEmpty
+        ? 'your medicine'
+        : _nameController.text.trim();
+
+    try {
+      if (delayedSeconds == 0) {
+        await NotificationService.showInstantTestNotification(
+          notificationId: notificationId,
+          title: 'Test Reminder',
+          body: 'This is an instant reminder for $medicineName.',
+        );
+        _showSnackBar('Instant test notification sent.');
+      } else {
+        await NotificationService.scheduleTestNotificationInSeconds(
+          notificationId: notificationId,
+          seconds: delayedSeconds,
+          title: 'Test Reminder',
+          body: 'Time to take $medicineName.',
+        );
+        _showSnackBar('Test notification scheduled in 10 seconds.');
+      }
+    } catch (_) {
+      _showSnackBar('Unable to send test notification. Check permission.');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSendingTestNotification = false;
+        });
+        await _refreshNotificationStatus();
+      }
+    }
   }
 
   // Widget builder for the Green Expandable Headers
@@ -338,16 +482,18 @@ class _MedicineModalState extends State<MedicineModal> {
     );
   }
 
-  // Widget builder for the Special "Select Time/Date" rows
-  Widget _buildSpecificTimeGroup(String label, {bool isDateOnly = false}) {
-    final DateTime? value = isDateOnly ? _expirationDate : _specificDateTime;
+  Widget _buildReminderRangeGroup() {
+    final String timeText = _reminderTime == null
+        ? 'Select time'
+        : _formatTimeOfDay(_reminderTime!);
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            label,
+            'Specific Time Range',
             style: TextStyle(
               fontSize: 14,
               color: textDark,
@@ -361,46 +507,125 @@ class _MedicineModalState extends State<MedicineModal> {
               color: inputBgColor,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'Select:',
                   style: TextStyle(fontSize: 15, color: textDark),
                 ),
-                const SizedBox(width: 12),
-                // Date Pill
-                GestureDetector(
-                  onTap: () => _selectDate(isDateOnly: isDateOnly),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    GestureDetector(
+                      onTap: () => _selectReminderDate(isStart: true),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF0F0F0),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          _formatDate(_reminderStartDate) ?? 'Start date',
+                        ),
+                      ),
                     ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF0F0F0),
-                      borderRadius: BorderRadius.circular(20),
+                    GestureDetector(
+                      onTap: () => _selectReminderDate(isStart: false),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF0F0F0),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          _formatDate(_reminderEndDate) ?? 'End date',
+                        ),
+                      ),
                     ),
-                    child: Text(_formatDate(value) ?? 'Select date'),
-                  ),
+                    GestureDetector(
+                      onTap: _selectReminderTime,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF0F0F0),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(timeText),
+                      ),
+                    ),
+                  ],
                 ),
-                if (!isDateOnly) ...[
-                  const SizedBox(width: 8),
-                  // Time Pill
-                  GestureDetector(
-                    onTap: _selectTime,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildExpirationDateGroup() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Expiration Date',
+            style: TextStyle(
+              fontSize: 14,
+              color: textDark,
+              fontWeight: FontWeight.w400,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: inputBgColor,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Select:',
+                  style: TextStyle(fontSize: 15, color: textDark),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    GestureDetector(
+                      onTap: _selectExpirationDate,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF0F0F0),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          _formatDate(_expirationDate) ?? 'Select date',
+                        ),
                       ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF0F0F0),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(_formatTime(value) ?? 'Select time'),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ],
             ),
           ),
@@ -415,6 +640,50 @@ class _MedicineModalState extends State<MedicineModal> {
       return;
     }
 
+    final bool hasReminderInput =
+        _reminderStartDate != null ||
+        _reminderEndDate != null ||
+        _reminderTime != null;
+    if (hasReminderInput &&
+        (_reminderStartDate == null ||
+            _reminderEndDate == null ||
+            _reminderTime == null)) {
+      _showSnackBar('Please select start date, end date, and time.');
+      return;
+    }
+
+    if (_reminderStartDate != null &&
+        _reminderEndDate != null &&
+        _reminderEndDate!.isBefore(_reminderStartDate!)) {
+      _showSnackBar('End date must be on or after start date.');
+      return;
+    }
+
+    final bool hasReminderRange =
+        _reminderStartDate != null &&
+        _reminderEndDate != null &&
+        _reminderTime != null;
+
+    DateTime? reminderDateTime;
+    if (_reminderStartDate != null && _reminderTime != null) {
+      reminderDateTime = DateTime(
+        _reminderStartDate!.year,
+        _reminderStartDate!.month,
+        _reminderStartDate!.day,
+        _reminderTime!.hour,
+        _reminderTime!.minute,
+      );
+    }
+
+    String? postSaveMessage;
+    if (!hasReminderRange &&
+        reminderDateTime != null &&
+        !reminderDateTime.isAfter(DateTime.now())) {
+      reminderDateTime = null;
+      postSaveMessage =
+          'Medicine saved, but reminder was not scheduled because the selected time is in the past.';
+    }
+
     setState(() {
       _isSaving = true;
     });
@@ -425,14 +694,62 @@ class _MedicineModalState extends State<MedicineModal> {
       details: _detailsController.text.trim(),
       doseAmount: _doseAmountController.text.trim(),
       frequency: _frequencyController.text.trim(),
-      specificTime: _specificDateTime,
+      specificTime: reminderDateTime,
+      reminderStartDate: _reminderStartDate,
+      reminderEndDate: _reminderEndDate,
       currentStock: int.tryParse(_currentStockController.text.trim()),
       alarmStock: int.tryParse(_alarmStockController.text.trim()),
       expirationDate: _expirationDate,
       createdAt: DateTime.now(),
     );
 
-    await MedicineStorage.addMedicine(record);
+    try {
+      await MedicineStorage.addMedicine(record);
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+        _showSnackBar('Unable to save medicine. Please try again.');
+      }
+      return;
+    }
+
+    if (hasReminderRange) {
+      try {
+        final int scheduledCount =
+            await NotificationService.scheduleMedicineReminderRange(
+              baseNotificationId:
+                  record.createdAt.millisecondsSinceEpoch ~/ 1000,
+              medicineName: record.name,
+              startDate: _reminderStartDate!,
+              endDate: _reminderEndDate!,
+              hour: _reminderTime!.hour,
+              minute: _reminderTime!.minute,
+              doseAmount: record.doseAmount,
+            );
+
+        if (scheduledCount == 0) {
+          postSaveMessage =
+              'Medicine saved, but no reminders were scheduled because all selected dates are in the past.';
+        }
+      } catch (_) {
+        postSaveMessage =
+            'Medicine saved, but reminder could not be scheduled. Check notification permission.';
+      }
+    } else if (reminderDateTime != null) {
+      try {
+        await NotificationService.scheduleMedicineReminder(
+          notificationId: record.createdAt.millisecondsSinceEpoch ~/ 1000,
+          medicineName: record.name,
+          scheduledAt: reminderDateTime,
+          doseAmount: record.doseAmount,
+        );
+      } catch (_) {
+        postSaveMessage =
+            'Medicine saved, but reminder could not be scheduled. Check notification permission.';
+      }
+    }
 
     if (!mounted) {
       return;
@@ -441,6 +758,9 @@ class _MedicineModalState extends State<MedicineModal> {
     setState(() {
       _isSaving = false;
     });
+    if (postSaveMessage != null) {
+      _showSnackBar(postSaveMessage);
+    }
     Navigator.pop(context, true);
   }
 
@@ -453,16 +773,20 @@ class _MedicineModalState extends State<MedicineModal> {
       _frequencyController.clear();
       _currentStockController.clear();
       _alarmStockController.clear();
-      _specificDateTime = null;
+      _reminderStartDate = null;
+      _reminderEndDate = null;
+      _reminderTime = null;
       _expirationDate = null;
     });
   }
 
-  Future<void> _selectDate({required bool isDateOnly}) async {
+  Future<void> _selectReminderDate({required bool isStart}) async {
     final DateTime now = DateTime.now();
-    final DateTime initialDate = isDateOnly
-        ? (_expirationDate ?? now)
-        : (_specificDateTime ?? now);
+    final DateTime? existingDate = isStart
+        ? _reminderStartDate
+        : _reminderEndDate;
+    final DateTime initialDate = existingDate ?? _reminderStartDate ?? now;
+
     final DateTime? selectedDate = await showDatePicker(
       context: context,
       initialDate: initialDate,
@@ -475,27 +799,24 @@ class _MedicineModalState extends State<MedicineModal> {
     }
 
     setState(() {
-      if (isDateOnly) {
-        _expirationDate = selectedDate;
+      if (isStart) {
+        _reminderStartDate = selectedDate;
+
+        if (_reminderEndDate != null &&
+            _reminderEndDate!.isBefore(_reminderStartDate!)) {
+          _reminderEndDate = _reminderStartDate;
+        }
       } else {
-        final DateTime current = _specificDateTime ?? now;
-        _specificDateTime = DateTime(
-          selectedDate.year,
-          selectedDate.month,
-          selectedDate.day,
-          current.hour,
-          current.minute,
-        );
+        _reminderEndDate = selectedDate;
       }
     });
   }
 
-  Future<void> _selectTime() async {
-    final DateTime now = DateTime.now();
-    final DateTime current = _specificDateTime ?? now;
+  Future<void> _selectReminderTime() async {
+    final TimeOfDay initialTime = _reminderTime ?? TimeOfDay.now();
     final TimeOfDay? time = await showTimePicker(
       context: context,
-      initialTime: TimeOfDay.fromDateTime(current),
+      initialTime: initialTime,
     );
 
     if (time == null) {
@@ -503,14 +824,27 @@ class _MedicineModalState extends State<MedicineModal> {
     }
 
     setState(() {
-      final DateTime baseDate = _specificDateTime ?? now;
-      _specificDateTime = DateTime(
-        baseDate.year,
-        baseDate.month,
-        baseDate.day,
-        time.hour,
-        time.minute,
-      );
+      _reminderTime = time;
+    });
+  }
+
+  Future<void> _selectExpirationDate() async {
+    final DateTime now = DateTime.now();
+    final DateTime initialDate = _expirationDate ?? now;
+
+    final DateTime? selectedDate = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: DateTime(now.year - 1),
+      lastDate: DateTime(now.year + 10),
+    );
+
+    if (selectedDate == null) {
+      return;
+    }
+
+    setState(() {
+      _expirationDate = selectedDate;
     });
   }
 
@@ -537,13 +871,15 @@ class _MedicineModalState extends State<MedicineModal> {
     return '${months[dateTime.month - 1]} ${dateTime.day}, ${dateTime.year}';
   }
 
-  String? _formatTime(DateTime? dateTime) {
-    if (dateTime == null) {
-      return null;
-    }
-
-    final TimeOfDay timeOfDay = TimeOfDay.fromDateTime(dateTime);
-    return timeOfDay.format(context);
+  String _formatTimeOfDay(TimeOfDay timeOfDay) {
+    final DateTime dateTime = DateTime(
+      2000,
+      1,
+      1,
+      timeOfDay.hour,
+      timeOfDay.minute,
+    );
+    return TimeOfDay.fromDateTime(dateTime).format(context);
   }
 
   void _showSnackBar(String message) {
