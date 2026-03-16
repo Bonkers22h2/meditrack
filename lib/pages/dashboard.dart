@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:meditrack/modals/medicine_details_modal.dart';
 import 'package:meditrack/modals/medicine_modal.dart';
 import 'package:meditrack/services/medicine_storage.dart';
 
@@ -76,6 +77,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (didSave == true) {
       await _loadMedicines();
     }
+  }
+
+  Future<void> _openMedicineDetailsModal(MedicineRecord medicine) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext context) {
+        return MedicineDetailsModal(medicine: medicine);
+      },
+    );
   }
 
   String _buildSubtitle(MedicineRecord medicine) {
@@ -267,52 +279,64 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         },
                         itemBuilder: (BuildContext context, int index) {
                           final MedicineRecord medicine = _medicines[index];
-                          return Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 14,
-                            ),
-                            decoration: BoxDecoration(
-                              color: cardColor,
+                          return Material(
+                            color: Colors.transparent,
+                            child: InkWell(
                               borderRadius: BorderRadius.circular(18),
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 10,
-                                  height: 10,
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF87A884),
-                                    borderRadius: BorderRadius.circular(5),
-                                  ),
+                              onTap: () => _openMedicineDetailsModal(medicine),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 14,
                                 ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        medicine.name,
-                                        style: TextStyle(
-                                          color: textDark,
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        _buildSubtitle(medicine),
-                                        style: TextStyle(
-                                          color: textFaint,
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                                decoration: BoxDecoration(
+                                  color: cardColor,
+                                  borderRadius: BorderRadius.circular(18),
                                 ),
-                              ],
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 10,
+                                      height: 10,
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF87A884),
+                                        borderRadius: BorderRadius.circular(5),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            medicine.name,
+                                            style: TextStyle(
+                                              color: textDark,
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            _buildSubtitle(medicine),
+                                            style: TextStyle(
+                                              color: textFaint,
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Icon(
+                                      Icons.chevron_right,
+                                      color: textFaint,
+                                      size: 22,
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
                           );
                         },
