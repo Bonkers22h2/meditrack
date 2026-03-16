@@ -107,6 +107,31 @@ class MedicineStorage {
     await saveMedicines(medicines);
   }
 
+  static Future<void> updateMedicine(MedicineRecord updatedMedicine) async {
+    final List<MedicineRecord> medicines = await loadMedicines();
+    final int index = medicines.indexWhere(
+      (MedicineRecord medicine) =>
+          medicine.createdAt.isAtSameMomentAs(updatedMedicine.createdAt),
+    );
+
+    if (index >= 0) {
+      medicines[index] = updatedMedicine;
+    } else {
+      medicines.add(updatedMedicine);
+    }
+
+    await saveMedicines(medicines);
+  }
+
+  static Future<void> deleteMedicine(MedicineRecord medicineToDelete) async {
+    final List<MedicineRecord> medicines = await loadMedicines();
+    medicines.removeWhere(
+      (MedicineRecord medicine) =>
+          medicine.createdAt.isAtSameMomentAs(medicineToDelete.createdAt),
+    );
+    await saveMedicines(medicines);
+  }
+
   static Future<void> clearMedicines() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.remove(_storageKey);

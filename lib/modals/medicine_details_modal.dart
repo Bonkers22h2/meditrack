@@ -1,10 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:meditrack/modals/medicine_modal.dart';
 import 'package:meditrack/services/medicine_storage.dart';
 
-class MedicineDetailsModal extends StatelessWidget {
+class MedicineDetailsModal extends StatefulWidget {
   const MedicineDetailsModal({required this.medicine, super.key});
 
   final MedicineRecord medicine;
+
+  @override
+  State<MedicineDetailsModal> createState() => _MedicineDetailsModalState();
+}
+
+class _MedicineDetailsModalState extends State<MedicineDetailsModal> {
+  bool _isDeleting = false;
 
   final Color _modalBgColor = const Color(0xFFF2F6EF);
   final Color _cardColor = Colors.white;
@@ -55,9 +63,9 @@ class MedicineDetailsModal extends StatelessWidget {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      medicine.name.isEmpty
+                      widget.medicine.name.isEmpty
                           ? 'Medicine details'
-                          : medicine.name,
+                          : widget.medicine.name,
                       style: TextStyle(
                         fontSize: 28,
                         height: 1.15,
@@ -80,15 +88,15 @@ class MedicineDetailsModal extends StatelessWidget {
                       children: [
                         _buildInfoRow(
                           'Strength',
-                          _displayValue(medicine.strength),
+                          _displayValue(widget.medicine.strength),
                         ),
                         _buildInfoRow(
                           'Dose amount',
-                          _displayValue(medicine.doseAmount),
+                          _displayValue(widget.medicine.doseAmount),
                         ),
                         _buildInfoRow(
                           'Frequency',
-                          _displayValue(medicine.frequency),
+                          _displayValue(widget.medicine.frequency),
                         ),
                       ],
                     ),
@@ -98,8 +106,8 @@ class MedicineDetailsModal extends StatelessWidget {
                         _buildInfoRow(
                           'Date range',
                           _buildDateRangeText(
-                            medicine.reminderStartDate,
-                            medicine.reminderEndDate,
+                            widget.medicine.reminderStartDate,
+                            widget.medicine.reminderEndDate,
                           ),
                         ),
                         _buildInfoRow(
@@ -108,7 +116,7 @@ class MedicineDetailsModal extends StatelessWidget {
                         ),
                         _buildInfoRow(
                           'Expires on',
-                          _formatDate(medicine.expirationDate),
+                          _formatDate(widget.medicine.expirationDate),
                         ),
                       ],
                     ),
@@ -117,11 +125,11 @@ class MedicineDetailsModal extends StatelessWidget {
                       children: [
                         _buildInfoRow(
                           'Current stock',
-                          medicine.currentStock?.toString() ?? 'Not set',
+                          widget.medicine.currentStock?.toString() ?? 'Not set',
                         ),
                         _buildInfoRow(
                           'Low stock alert',
-                          medicine.alarmStock?.toString() ?? 'Not set',
+                          widget.medicine.alarmStock?.toString() ?? 'Not set',
                         ),
                       ],
                     ),
@@ -130,11 +138,11 @@ class MedicineDetailsModal extends StatelessWidget {
                       children: [
                         _buildInfoRow(
                           'Details',
-                          _displayValue(medicine.details),
+                          _displayValue(widget.medicine.details),
                         ),
                         _buildInfoRow(
                           'Saved on',
-                          _formatDateTime(context, medicine.createdAt),
+                          _formatDateTime(context, widget.medicine.createdAt),
                         ),
                       ],
                     ),
@@ -144,24 +152,88 @@ class MedicineDetailsModal extends StatelessWidget {
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 10, 24, 24),
-              child: SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: ElevatedButton.icon(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.check_circle_outline, size: 24),
-                  label: const Text(
-                    'Done',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _isDeleting ? null : _editMedicine,
+                          icon: const Icon(Icons.edit_outlined, size: 20),
+                          label: const Text(
+                            'Edit',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: _accentColor,
+                            side: BorderSide(color: _accentColor),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            minimumSize: const Size(double.infinity, 52),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: _isDeleting ? null : _confirmDelete,
+                          icon: _isDeleting
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.delete_outline, size: 20),
+                          label: Text(
+                            _isDeleting ? 'Deleting...' : 'Delete',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFB53434),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            minimumSize: const Size(double.infinity, 52),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _accentColor,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: ElevatedButton.icon(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.check_circle_outline, size: 24),
+                      label: const Text(
+                        'Done',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _accentColor,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                ],
               ),
             ),
           ],
@@ -243,11 +315,13 @@ class MedicineDetailsModal extends StatelessWidget {
   }
 
   String _buildReminderTimeText(BuildContext context) {
-    if (medicine.specificTime == null) {
+    if (widget.medicine.specificTime == null) {
       return 'Not set';
     }
 
-    return TimeOfDay.fromDateTime(medicine.specificTime!).format(context);
+    return TimeOfDay.fromDateTime(
+      widget.medicine.specificTime!,
+    ).format(context);
   }
 
   String _displayValue(String value) {
@@ -282,5 +356,81 @@ class MedicineDetailsModal extends StatelessWidget {
     final String date = _formatDate(dateTime);
     final String time = TimeOfDay.fromDateTime(dateTime).format(context);
     return '$date, $time';
+  }
+
+  Future<void> _editMedicine() async {
+    final bool? didUpdate = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext context) {
+        return MedicineModal(initialMedicine: widget.medicine);
+      },
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    if (didUpdate == true) {
+      Navigator.pop(context, true);
+    }
+  }
+
+  Future<void> _confirmDelete() async {
+    final bool? shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Delete medication?'),
+          content: const Text(
+            'This will remove the medication from your reminders list.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldDelete != true) {
+      return;
+    }
+
+    setState(() {
+      _isDeleting = true;
+    });
+
+    try {
+      await MedicineStorage.deleteMedicine(widget.medicine);
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isDeleting = false;
+      });
+
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Unable to delete medication.')),
+        );
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    Navigator.pop(context, true);
   }
 }

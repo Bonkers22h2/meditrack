@@ -34,6 +34,7 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   List<MedicineRecord> _medicines = <MedicineRecord>[];
   bool _isLoading = true;
+  DateTime _selectedDate = DateTime.now();
 
   // Updated color palette for better visibility
   final Color backgroundColor = const Color(0xFFF4F5F0);
@@ -80,7 +81,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _openMedicineDetailsModal(MedicineRecord medicine) async {
-    await showModalBottomSheet<void>(
+    final bool? didChange = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -88,6 +89,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return MedicineDetailsModal(medicine: medicine);
       },
     );
+
+    if (didChange == true) {
+      await _loadMedicines();
+    }
   }
 
   String _buildSubtitle(MedicineRecord medicine) {
@@ -183,6 +188,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
               const SizedBox(height: 24),
 
+              // Date selector row
+              _buildDateSelector(),
+              const SizedBox(height: 24),
+
               // 3. Floating Input Box (Turned into a button to trigger modal)
               GestureDetector(
                 onTap: _openMedicineModal,
@@ -261,87 +270,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Expanded(
                 child: _isLoading
                     ? const Center(child: CircularProgressIndicator())
-                    : _medicines.isEmpty
-                    ? Center(
-                        child: Text(
-                          'No medications saved yet',
-                          style: TextStyle(
-                            color: textFaint,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      )
-                    : ListView.separated(
-                        itemCount: _medicines.length,
-                        separatorBuilder: (BuildContext context, int index) {
-                          return const SizedBox(height: 12);
-                        },
-                        itemBuilder: (BuildContext context, int index) {
-                          final MedicineRecord medicine = _medicines[index];
-                          return Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(18),
-                              onTap: () => _openMedicineDetailsModal(medicine),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 14,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: cardColor,
-                                  borderRadius: BorderRadius.circular(18),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      width: 10,
-                                      height: 10,
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF87A884),
-                                        borderRadius: BorderRadius.circular(5),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            medicine.name,
-                                            style: TextStyle(
-                                              color: textDark,
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            _buildSubtitle(medicine),
-                                            style: TextStyle(
-                                              color: textFaint,
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    Icon(
-                                      Icons.chevron_right,
-                                      color: textFaint,
-                                      size: 22,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
+                    : _buildRemindersForSelectedDate(),
               ),
+
+              const SizedBox(height: 16),
 
               // 5. Bottom Status Text
               Text(
@@ -361,6 +293,247 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
     );
   }
+
+  // Helper Methods scoped correctly within the State class
+  Widget _buildDateSelector() {
+    // Show 7 days: 3 before, today, 3 after
+    final DateTime today = DateTime.now();
+    final List<DateTime> days = List.generate(
+      7,
+      (i) => today.add(Duration(days: i - 3)),
+    );
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          const SizedBox(width: 4),
+          ...days.map((date) {
+            final bool isSelected = _isSameDay(date, _selectedDate);
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: ChoiceChip(
+                label: Text(
+                  _dateLabel(date, today),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: isSelected ? Colors.white : textDark,
+                    fontSize: 15,
+                  ),
+                ),
+                selected: isSelected,
+                selectedColor: const Color(0xFF8BBA91),
+                backgroundColor: cardColor,
+                onSelected: (_) {
+                  setState(() {
+                    _selectedDate = date;
+                  });
+                },
+              ),
+            );
+          }),
+          const SizedBox(width: 4),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRemindersForSelectedDate() {
+    // Gather all reminders for the selected date
+    final List<_ReminderInstance> reminders = _expandRemindersForDate(
+      _selectedDate,
+    );
+    if (reminders.isEmpty) {
+      return Center(
+        child: Text(
+          'No reminders for this day',
+          style: TextStyle(
+            color: textFaint,
+            fontSize: 15,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      );
+    }
+
+    // Group by time of day
+    final Map<String, List<_ReminderInstance>> grouped = {
+      'Morning': [],
+      'Afternoon': [],
+      'Night': [],
+    };
+    for (final r in reminders) {
+      final int hour = r.time.hour;
+      if (hour >= 5 && hour < 12) {
+        grouped['Morning']!.add(r);
+      } else if (hour >= 12 && hour < 18) {
+        grouped['Afternoon']!.add(r);
+      } else {
+        grouped['Night']!.add(r);
+      }
+    }
+    // Sort each group by time
+    for (final group in grouped.values) {
+      group.sort((a, b) => a.time.compareTo(b.time));
+    }
+
+    return ListView(
+      children: [
+        for (final period in ['Morning', 'Afternoon', 'Night'])
+          if (grouped[period]!.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.only(top: 16, bottom: 6, left: 4),
+              child: Text(
+                period,
+                style: TextStyle(
+                  fontSize: 19,
+                  fontWeight: FontWeight.bold,
+                  color: textDark,
+                ),
+              ),
+            ),
+            ...grouped[period]!.map((reminder) => _buildReminderCard(reminder)),
+          ],
+      ],
+    );
+  }
+
+  Widget _buildReminderCard(_ReminderInstance reminder) {
+    final medicine = reminder.medicine;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: () => _openMedicineDetailsModal(medicine),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: cardColor,
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF87A884),
+                  borderRadius: BorderRadius.circular(5),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                reminder.time.format(context),
+                style: TextStyle(
+                  color: textDark,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      medicine.name,
+                      style: TextStyle(
+                        color: textDark,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _buildSubtitle(medicine),
+                      style: TextStyle(
+                        color: textFaint,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right, color: textFaint, size: 22),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<_ReminderInstance> _expandRemindersForDate(DateTime date) {
+    final List<_ReminderInstance> result = [];
+    for (final medicine in _medicines) {
+      // If range is set, show for each day in range
+      if (medicine.reminderStartDate != null &&
+          medicine.reminderEndDate != null &&
+          medicine.specificTime != null) {
+        final DateTime d = DateTime(date.year, date.month, date.day);
+        final DateTime start = DateTime(
+          medicine.reminderStartDate!.year,
+          medicine.reminderStartDate!.month,
+          medicine.reminderStartDate!.day,
+        );
+        final DateTime end = DateTime(
+          medicine.reminderEndDate!.year,
+          medicine.reminderEndDate!.month,
+          medicine.reminderEndDate!.day,
+        );
+        if (!d.isBefore(start) && !d.isAfter(end)) {
+          result.add(
+            _ReminderInstance(
+              medicine: medicine,
+              time: TimeOfDay(
+                hour: medicine.specificTime!.hour,
+                minute: medicine.specificTime!.minute,
+              ),
+            ),
+          );
+        }
+      } else if (medicine.specificTime != null) {
+        // Single reminder
+        final DateTime d = DateTime(date.year, date.month, date.day);
+        final DateTime t = DateTime(
+          medicine.specificTime!.year,
+          medicine.specificTime!.month,
+          medicine.specificTime!.day,
+        );
+        if (d == t) {
+          result.add(
+            _ReminderInstance(
+              medicine: medicine,
+              time: TimeOfDay(
+                hour: medicine.specificTime!.hour,
+                minute: medicine.specificTime!.minute,
+              ),
+            ),
+          );
+        }
+      }
+    }
+    return result;
+  }
+
+  bool _isSameDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  String _dateLabel(DateTime date, DateTime today) {
+    if (_isSameDay(date, today)) return 'Today';
+    if (_isSameDay(date, today.add(const Duration(days: 1)))) return 'Tomorrow';
+    if (_isSameDay(date, today.subtract(const Duration(days: 1))))
+      return 'Yesterday';
+    return '${date.month}/${date.day}';
+  }
+}
+
+// Helper class defined completely outside the widget build block
+class _ReminderInstance {
+  final MedicineRecord medicine;
+  final TimeOfDay time;
+  _ReminderInstance({required this.medicine, required this.time});
 }
 
 // ---------------------------------------------------------

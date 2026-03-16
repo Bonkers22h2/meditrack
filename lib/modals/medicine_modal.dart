@@ -4,7 +4,9 @@ import 'package:meditrack/services/notification_service.dart';
 import 'package:meditrack/services/medicine_storage.dart';
 
 class MedicineModal extends StatefulWidget {
-  const MedicineModal({super.key});
+  const MedicineModal({super.key, this.initialMedicine});
+
+  final MedicineRecord? initialMedicine;
 
   @override
   State<MedicineModal> createState() => _MedicineModalState();
@@ -45,6 +47,7 @@ class _MedicineModalState extends State<MedicineModal> {
   @override
   void initState() {
     super.initState();
+    _populateInitialValues();
     _refreshNotificationStatus();
   }
 
@@ -62,6 +65,8 @@ class _MedicineModalState extends State<MedicineModal> {
 
   @override
   Widget build(BuildContext context) {
+    final bool isEditMode = widget.initialMedicine != null;
+
     // Wrap in a GestureDetector to dismiss keyboard on tap outside
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
@@ -249,7 +254,9 @@ class _MedicineModalState extends State<MedicineModal> {
                         elevation: 0,
                       ),
                       child: Text(
-                        _isSaving ? 'Saving...' : 'Save',
+                        _isSaving
+                            ? (isEditMode ? 'Updating...' : 'Saving...')
+                            : (isEditMode ? 'Update' : 'Save'),
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w400,
@@ -700,11 +707,15 @@ class _MedicineModalState extends State<MedicineModal> {
       currentStock: int.tryParse(_currentStockController.text.trim()),
       alarmStock: int.tryParse(_alarmStockController.text.trim()),
       expirationDate: _expirationDate,
-      createdAt: DateTime.now(),
+      createdAt: widget.initialMedicine?.createdAt ?? DateTime.now(),
     );
 
     try {
-      await MedicineStorage.addMedicine(record);
+      if (widget.initialMedicine == null) {
+        await MedicineStorage.addMedicine(record);
+      } else {
+        await MedicineStorage.updateMedicine(record);
+      }
     } catch (_) {
       if (mounted) {
         setState(() {
@@ -886,5 +897,41 @@ class _MedicineModalState extends State<MedicineModal> {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  void _populateInitialValues() {
+    final MedicineRecord? initial = widget.initialMedicine;
+    if (initial == null) {
+      return;
+    }
+
+    _isDosageExpanded = true;
+
+    _nameController.text = initial.name;
+    _strengthController.text = initial.strength;
+    _detailsController.text = initial.details;
+    _doseAmountController.text = initial.doseAmount;
+    _frequencyController.text = initial.frequency;
+    _currentStockController.text = initial.currentStock?.toString() ?? '';
+    _alarmStockController.text = initial.alarmStock?.toString() ?? '';
+
+    final DateTime? fallbackReminderDate = initial.specificTime == null
+        ? null
+        : DateTime(
+            initial.specificTime!.year,
+            initial.specificTime!.month,
+            initial.specificTime!.day,
+          );
+
+    _reminderStartDate = initial.reminderStartDate ?? fallbackReminderDate;
+    _reminderEndDate =
+        initial.reminderEndDate ?? _reminderStartDate ?? fallbackReminderDate;
+    if (initial.specificTime != null) {
+      _reminderTime = TimeOfDay(
+        hour: initial.specificTime!.hour,
+        minute: initial.specificTime!.minute,
+      );
+    }
+    _expirationDate = initial.expirationDate;
   }
 }
