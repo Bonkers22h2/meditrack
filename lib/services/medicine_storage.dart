@@ -2,8 +2,11 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:meditrack/services/medicine_icons.dart';
+
 class MedicineRecord {
   MedicineRecord({
+    this.iconKey = MedicineIcons.defaultIconKey,
     required this.name,
     required this.strength,
     required this.details,
@@ -18,6 +21,7 @@ class MedicineRecord {
     required this.createdAt,
   });
 
+  final String iconKey;
   final String name;
   final String strength;
   final String details;
@@ -33,6 +37,7 @@ class MedicineRecord {
 
   factory MedicineRecord.fromJson(Map<String, dynamic> json) {
     return MedicineRecord(
+      iconKey: (json['iconKey'] as String?) ?? MedicineIcons.defaultIconKey,
       name: (json['name'] as String?) ?? '',
       strength: (json['strength'] as String?) ?? '',
       details: (json['details'] as String?) ?? '',
@@ -53,6 +58,7 @@ class MedicineRecord {
 
   Map<String, dynamic> toJson() {
     return <String, dynamic>{
+      'iconKey': iconKey,
       'name': name,
       'strength': strength,
       'details': details,

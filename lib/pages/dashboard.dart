@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:meditrack/modals/medicine_details_modal.dart';
 import 'package:meditrack/modals/medicine_modal.dart';
+import 'package:meditrack/services/medicine_icons.dart';
 import 'package:meditrack/services/medicine_storage.dart';
 
 void main() {
@@ -414,11 +415,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
           child: Row(
             children: [
               Container(
-                width: 10,
-                height: 10,
+                width: 34,
+                height: 34,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF87A884),
-                  borderRadius: BorderRadius.circular(5),
+                  color: const Color(0xFFE7EFE4),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  MedicineIcons.resolve(medicine.iconKey),
+                  color: const Color(0xFF5C7A58),
+                  size: 20,
                 ),
               ),
               const SizedBox(width: 12),

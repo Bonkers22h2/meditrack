@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:meditrack/modals/medicine_modal.dart';
+import 'package:meditrack/services/medicine_icons.dart';
 import 'package:meditrack/services/medicine_storage.dart';
 
 class MedicineDetailsModal extends StatefulWidget {
@@ -54,8 +55,8 @@ class _MedicineDetailsModalState extends State<MedicineDetailsModal> {
                       color: _accentColor,
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    child: const Icon(
-                      Icons.medication_outlined,
+                    child: Icon(
+                      MedicineIcons.resolve(widget.medicine.iconKey),
                       color: Colors.white,
                       size: 26,
                     ),

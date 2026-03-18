@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:meditrack/services/medicine_icons.dart';
 import 'package:meditrack/services/notification_service.dart';
 import 'package:meditrack/services/medicine_storage.dart';
 
@@ -29,6 +30,7 @@ class _MedicineModalState extends State<MedicineModal>
   DateTime? _reminderEndDate;
   TimeOfDay? _reminderTime;
   DateTime? _expirationDate;
+  String _selectedIconKey = MedicineIcons.defaultIconKey;
   bool _isSaving = false;
   bool? _notificationsEnabled;
   bool _isCheckingNotificationStatus = true;
@@ -74,235 +76,286 @@ class _MedicineModalState extends State<MedicineModal>
   @override
   Widget build(BuildContext context) {
     final bool isEditMode = widget.initialMedicine != null;
+    final double maxModalHeight = MediaQuery.of(context).size.height * 0.9;
 
     // Wrap in a GestureDetector to dismiss keyboard on tap outside
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
-      child: Container(
-        height: MediaQuery.of(context).size.height * 0.85,
-        decoration: BoxDecoration(
-          color: modalBgColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-        ),
+      child: AnimatedPadding(
+        duration: const Duration(milliseconds: 150),
+        curve: Curves.easeOut,
         // Adjust for system keyboard
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom,
         ),
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
-              child: Row(
-                children: [
-                  Container(
-                    width: 60,
-                    height: 60,
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Text(
-                    'Edit Medicine Icon',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: textDark,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 24),
+        child: Align(
+          alignment: Alignment.bottomCenter,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: maxModalHeight),
+            child: Container(
               decoration: BoxDecoration(
-                color: sectionHeaderColor,
-                borderRadius: BorderRadius.circular(12),
+                color: modalBgColor,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(32),
+                ),
               ),
-              child: TabBar(
-                controller: _tabController,
-                onTap: (int index) {
-                  setState(() {
-                    _currentTabIndex = index;
-                  });
-                },
-                labelColor: textDark,
-                unselectedLabelColor: textDark.withOpacity(0.75),
-                labelStyle: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                ),
-                unselectedLabelStyle: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
-                ),
-                indicator: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                indicatorSize: TabBarIndicatorSize.tab,
-                dividerColor: Colors.transparent,
-                tabs: const [
-                  Tab(text: 'Details'),
-                  Tab(text: 'Dosage'),
-                  Tab(text: 'Inventory'),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                physics: const NeverScrollableScrollPhysics(),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
+                    child: Row(
                       children: [
-                        _buildInputGroup(
-                          label: 'Medication name',
-                          hint: 'Name..',
-                          controller: _nameController,
-                        ),
-                        _buildInputGroup(
-                          label: 'Strength',
-                          hint: '500mg..',
-                          controller: _strengthController,
-                        ),
-                        _buildInputGroup(
-                          label: 'Details',
-                          hint: 'For Diabetes..',
-                          controller: _detailsController,
-                        ),
-                      ],
-                    ),
-                  ),
-                  SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildInputGroup(
-                          label: 'Dose Amount',
-                          hint: '1 pill..',
-                          controller: _doseAmountController,
-                        ),
-                        _buildInputGroup(
-                          label: 'Frequency',
-                          hint: 'Daily..',
-                          controller: _frequencyController,
-                        ),
-                        _buildReminderRangeGroup(),
-                        _buildNotificationTestCard(),
-                      ],
-                    ),
-                  ),
-                  SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildInputGroup(
-                          label: 'Current stock',
-                          hint: 'Total medicine..',
-                          controller: _currentStockController,
-                          keyboardType: TextInputType.number,
-                        ),
-                        _buildInputGroup(
-                          label: 'Alarm when Stock hits:',
-                          hint: '1..',
-                          controller: _alarmStockController,
-                          keyboardType: TextInputType.number,
-                        ),
-                        _buildExpirationDateGroup(),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // 5. Bottom Buttons Row
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-              child: Row(
-                children: [
-                  // Clear Button
-                  Expanded(
-                    flex: 2,
-                    child: ElevatedButton(
-                      onPressed: _clearForm,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: clearBtnColor,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        elevation: 0,
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
-                          Icon(Icons.delete_outline, size: 20),
-                          SizedBox(width: 8),
-                          Text(
-                            'Clear',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w400,
+                        GestureDetector(
+                          onTap: _showIconPicker,
+                          child: Container(
+                            width: 60,
+                            height: 60,
+                            decoration: const BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              MedicineIcons.resolve(_selectedIconKey),
+                              color: sectionHeaderColor,
+                              size: 32,
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Medicine Icon',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: textDark,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Tap icon to change',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: textDark.withOpacity(0.75),
+                                  fontWeight: FontWeight.w400,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: _showIconPicker,
+                          child: const Text('Edit'),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 24),
+                    decoration: BoxDecoration(
+                      color: sectionHeaderColor,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: TabBar(
+                      controller: _tabController,
+                      onTap: (int index) {
+                        setState(() {
+                          _currentTabIndex = index;
+                        });
+                      },
+                      labelColor: textDark,
+                      unselectedLabelColor: textDark.withOpacity(0.75),
+                      labelStyle: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      unselectedLabelStyle: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      indicator: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      indicatorSize: TabBarIndicatorSize.tab,
+                      dividerColor: Colors.transparent,
+                      tabs: const [
+                        Tab(text: 'Details'),
+                        Tab(text: 'Dosage'),
+                        Tab(text: 'Inventory'),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Flexible(
+                    fit: FlexFit.loose,
+                    child: AnimatedSize(
+                      duration: const Duration(milliseconds: 220),
+                      curve: Curves.easeInOut,
+                      alignment: Alignment.topCenter,
+                      child: _buildCurrentTabContent(),
+                    ),
+                  ),
 
-                  // Save Button
-                  Expanded(
-                    flex: 3,
-                    child: ElevatedButton(
-                      onPressed: _isSaving
-                          ? null
-                          : () {
-                              if (_currentTabIndex < 2) {
-                                _goToTab(_currentTabIndex + 1);
-                                return;
-                              }
-                              _saveMedicine();
-                            },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: saveBtnColor,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
+                  // 5. Bottom Buttons Row
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+                    child: Row(
+                      children: [
+                        // Clear Button
+                        Expanded(
+                          flex: 2,
+                          child: ElevatedButton(
+                            onPressed: _clearForm,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: clearBtnColor,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              elevation: 0,
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: const [
+                                Icon(Icons.delete_outline, size: 20),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Clear',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w400,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
-                        elevation: 0,
-                      ),
-                      child: Text(
-                        _currentTabIndex < 2
-                            ? 'Next'
-                            : _isSaving
-                            ? (isEditMode ? 'Updating...' : 'Saving...')
-                            : (isEditMode ? 'Update' : 'Save'),
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w400,
+                        const SizedBox(width: 16),
+
+                        // Save Button
+                        Expanded(
+                          flex: 3,
+                          child: ElevatedButton(
+                            onPressed: _isSaving
+                                ? null
+                                : () {
+                                    if (_currentTabIndex < 2) {
+                                      _goToTab(_currentTabIndex + 1);
+                                      return;
+                                    }
+                                    _saveMedicine();
+                                  },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: saveBtnColor,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              elevation: 0,
+                            ),
+                            child: Text(
+                              _currentTabIndex < 2
+                                  ? 'Next'
+                                  : _isSaving
+                                  ? (isEditMode ? 'Updating...' : 'Saving...')
+                                  : (isEditMode ? 'Update' : 'Save'),
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w400,
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
-          ],
+          ),
         ),
       ),
     );
+  }
+
+  Widget _buildCurrentTabContent() {
+    switch (_currentTabIndex) {
+      case 0:
+        return SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildInputGroup(
+                label: 'Medication name',
+                hint: 'Name..',
+                controller: _nameController,
+              ),
+              _buildInputGroup(
+                label: 'Strength',
+                hint: '500mg..',
+                controller: _strengthController,
+              ),
+              _buildInputGroup(
+                label: 'Details',
+                hint: 'For Diabetes..',
+                controller: _detailsController,
+              ),
+            ],
+          ),
+        );
+      case 1:
+        return SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildInputGroup(
+                label: 'Dose Amount',
+                hint: '1 pill..',
+                controller: _doseAmountController,
+              ),
+              _buildInputGroup(
+                label: 'Frequency',
+                hint: 'Daily..',
+                controller: _frequencyController,
+              ),
+              _buildReminderRangeGroup(),
+              _buildNotificationTestCard(),
+            ],
+          ),
+        );
+      case 2:
+      default:
+        return SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildInputGroup(
+                label: 'Current stock',
+                hint: 'Total medicine..',
+                controller: _currentStockController,
+                keyboardType: TextInputType.number,
+              ),
+              _buildInputGroup(
+                label: 'Alarm when Stock hits:',
+                hint: '1..',
+                controller: _alarmStockController,
+                keyboardType: TextInputType.number,
+              ),
+              _buildExpirationDateGroup(),
+            ],
+          ),
+        );
+    }
   }
 
   Widget _buildNotificationTestCard() {
@@ -518,57 +571,77 @@ class _MedicineModalState extends State<MedicineModal>
                   style: TextStyle(fontSize: 15, color: textDark),
                 ),
                 const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                Row(
                   children: [
-                    GestureDetector(
-                      onTap: () => _selectReminderDate(isStart: true),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF0F0F0),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          _formatDate(_reminderStartDate) ?? 'Start date',
-                        ),
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: () => _selectReminderDate(isStart: false),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF0F0F0),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          _formatDate(_reminderEndDate) ?? 'End date',
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => _selectReminderDate(isStart: true),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF0F0F0),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            _formatDate(_reminderStartDate) ?? 'Start date',
+                            textAlign: TextAlign.center,
+                          ),
                         ),
                       ),
                     ),
-                    GestureDetector(
-                      onTap: _selectReminderTime,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => _selectReminderDate(isStart: false),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF0F0F0),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            _formatDate(_reminderEndDate) ?? 'End date',
+                            textAlign: TextAlign.center,
+                          ),
                         ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF0F0F0),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(timeText),
                       ),
                     ),
                   ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: inputBgColor,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Time:', style: TextStyle(fontSize: 15, color: textDark)),
+                const SizedBox(height: 8),
+                GestureDetector(
+                  onTap: _selectReminderTime,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0F0F0),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(timeText),
+                  ),
                 ),
               ],
             ),
@@ -692,6 +765,7 @@ class _MedicineModalState extends State<MedicineModal>
     });
 
     final MedicineRecord record = MedicineRecord(
+      iconKey: _selectedIconKey,
       name: _nameController.text.trim(),
       strength: _strengthController.text.trim(),
       details: _detailsController.text.trim(),
@@ -784,6 +858,55 @@ class _MedicineModalState extends State<MedicineModal>
       _reminderEndDate = null;
       _reminderTime = null;
       _expirationDate = null;
+      _selectedIconKey = MedicineIcons.defaultIconKey;
+    });
+  }
+
+  Future<void> _showIconPicker() async {
+    final String? selected = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Choose medicine icon',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: MedicineIcons.options.map((
+                    MedicineIconOption option,
+                  ) {
+                    final bool isSelected = option.key == _selectedIconKey;
+                    return ChoiceChip(
+                      label: Text(option.label),
+                      avatar: Icon(option.icon, size: 18),
+                      selected: isSelected,
+                      onSelected: (_) => Navigator.pop(context, option.key),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (selected == null) {
+      return;
+    }
+
+    setState(() {
+      _selectedIconKey = selected;
     });
   }
 
@@ -908,6 +1031,7 @@ class _MedicineModalState extends State<MedicineModal>
       return;
     }
 
+    _selectedIconKey = initial.iconKey;
     _nameController.text = initial.name;
     _strengthController.text = initial.strength;
     _detailsController.text = initial.details;
