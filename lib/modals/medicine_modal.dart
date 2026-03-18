@@ -12,11 +12,10 @@ class MedicineModal extends StatefulWidget {
   State<MedicineModal> createState() => _MedicineModalState();
 }
 
-class _MedicineModalState extends State<MedicineModal> {
-  // State for which section is currently expanded
-  bool _isDetailsExpanded = true;
-  bool _isDosageExpanded = false;
-  bool _isInventoryExpanded = false;
+class _MedicineModalState extends State<MedicineModal>
+    with SingleTickerProviderStateMixin {
+  int _currentTabIndex = 0;
+  late final TabController _tabController;
 
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _strengthController = TextEditingController();
@@ -47,12 +46,21 @@ class _MedicineModalState extends State<MedicineModal> {
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 3, vsync: this)
+      ..addListener(() {
+        if (_tabController.indexIsChanging) {
+          setState(() {
+            _currentTabIndex = _tabController.index;
+          });
+        }
+      });
     _populateInitialValues();
     _refreshNotificationStatus();
   }
 
   @override
   void dispose() {
+    _tabController.dispose();
     _nameController.dispose();
     _strengthController.dispose();
     _detailsController.dispose();
@@ -82,123 +90,137 @@ class _MedicineModalState extends State<MedicineModal> {
         ),
         child: Column(
           children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
+              child: Row(
+                children: [
+                  Container(
+                    width: 60,
+                    height: 60,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Text(
+                    'Edit Medicine Icon',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: textDark,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 24),
+              decoration: BoxDecoration(
+                color: sectionHeaderColor,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: TabBar(
+                controller: _tabController,
+                onTap: (int index) {
+                  setState(() {
+                    _currentTabIndex = index;
+                  });
+                },
+                labelColor: textDark,
+                unselectedLabelColor: textDark.withOpacity(0.75),
+                labelStyle: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
+                unselectedLabelStyle: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                ),
+                indicator: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                indicatorSize: TabBarIndicatorSize.tab,
+                dividerColor: Colors.transparent,
+                tabs: const [
+                  Tab(text: 'Details'),
+                  Tab(text: 'Dosage'),
+                  Tab(text: 'Inventory'),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
             Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 8),
-                    // 1. Header (Icon + Text)
-                    Row(
+              child: TabBarView(
+                controller: _tabController,
+                physics: const NeverScrollableScrollPhysics(),
+                children: [
+                  SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          width: 60,
-                          height: 60,
-                          decoration: const BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                          ),
+                        _buildInputGroup(
+                          label: 'Medication name',
+                          hint: 'Name..',
+                          controller: _nameController,
                         ),
-                        const SizedBox(width: 16),
-                        Text(
-                          'Edit Medicine Icon',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: textDark,
-                            fontWeight: FontWeight.w500,
-                          ),
+                        _buildInputGroup(
+                          label: 'Strength',
+                          hint: '500mg..',
+                          controller: _strengthController,
+                        ),
+                        _buildInputGroup(
+                          label: 'Details',
+                          hint: 'For Diabetes..',
+                          controller: _detailsController,
                         ),
                       ],
                     ),
-                    const SizedBox(height: 32),
-
-                    // 2. Medication Details Section
-                    _buildSectionHeader(
-                      title: 'Medication Details',
-                      isExpanded: _isDetailsExpanded,
-                      onTap: () {
-                        setState(() {
-                          _isDetailsExpanded = !_isDetailsExpanded;
-                        });
-                      },
+                  ),
+                  SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildInputGroup(
+                          label: 'Dose Amount',
+                          hint: '1 pill..',
+                          controller: _doseAmountController,
+                        ),
+                        _buildInputGroup(
+                          label: 'Frequency',
+                          hint: 'Daily..',
+                          controller: _frequencyController,
+                        ),
+                        _buildReminderRangeGroup(),
+                        _buildNotificationTestCard(),
+                      ],
                     ),
-                    if (_isDetailsExpanded) ...[
-                      const SizedBox(height: 16),
-                      _buildInputGroup(
-                        label: 'Medication name',
-                        hint: 'Name..',
-                        controller: _nameController,
-                      ),
-                      _buildInputGroup(
-                        label: 'Strength',
-                        hint: '500mg..',
-                        controller: _strengthController,
-                      ),
-                      _buildInputGroup(
-                        label: 'Details',
-                        hint: 'For Diabetes..',
-                        controller: _detailsController,
-                      ),
-                    ],
-                    const SizedBox(height: 12),
-
-                    // 3. Dosage Section
-                    _buildSectionHeader(
-                      title: 'Dosage',
-                      isExpanded: _isDosageExpanded,
-                      onTap: () {
-                        setState(() {
-                          _isDosageExpanded = !_isDosageExpanded;
-                        });
-                      },
+                  ),
+                  SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildInputGroup(
+                          label: 'Current stock',
+                          hint: 'Total medicine..',
+                          controller: _currentStockController,
+                          keyboardType: TextInputType.number,
+                        ),
+                        _buildInputGroup(
+                          label: 'Alarm when Stock hits:',
+                          hint: '1..',
+                          controller: _alarmStockController,
+                          keyboardType: TextInputType.number,
+                        ),
+                        _buildExpirationDateGroup(),
+                      ],
                     ),
-                    if (_isDosageExpanded) ...[
-                      const SizedBox(height: 16),
-                      _buildInputGroup(
-                        label: 'Dose Amount',
-                        hint: '1 pill..',
-                        controller: _doseAmountController,
-                      ),
-                      _buildInputGroup(
-                        label: 'Frequency',
-                        hint: 'Daily..',
-                        controller: _frequencyController,
-                      ),
-                      _buildReminderRangeGroup(),
-                      _buildNotificationTestCard(),
-                    ],
-                    const SizedBox(height: 12),
-
-                    // 4. Inventory Section
-                    _buildSectionHeader(
-                      title: 'Inventory',
-                      isExpanded: _isInventoryExpanded,
-                      onTap: () {
-                        setState(() {
-                          _isInventoryExpanded = !_isInventoryExpanded;
-                        });
-                      },
-                    ),
-                    if (_isInventoryExpanded) ...[
-                      const SizedBox(height: 16),
-                      _buildInputGroup(
-                        label: 'Current stock',
-                        hint: 'Total medicine..',
-                        controller: _currentStockController,
-                        keyboardType: TextInputType.number,
-                      ),
-                      _buildInputGroup(
-                        label: 'Alarm when Stock hits:',
-                        hint: '1..',
-                        controller: _alarmStockController,
-                        keyboardType: TextInputType.number,
-                      ),
-                      _buildExpirationDateGroup(),
-                    ],
-                    const SizedBox(height: 24),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
 
@@ -243,7 +265,15 @@ class _MedicineModalState extends State<MedicineModal> {
                   Expanded(
                     flex: 3,
                     child: ElevatedButton(
-                      onPressed: _isSaving ? null : _saveMedicine,
+                      onPressed: _isSaving
+                          ? null
+                          : () {
+                              if (_currentTabIndex < 2) {
+                                _goToTab(_currentTabIndex + 1);
+                                return;
+                              }
+                              _saveMedicine();
+                            },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: saveBtnColor,
                         foregroundColor: Colors.white,
@@ -254,7 +284,9 @@ class _MedicineModalState extends State<MedicineModal> {
                         elevation: 0,
                       ),
                       child: Text(
-                        _isSaving
+                        _currentTabIndex < 2
+                            ? 'Next'
+                            : _isSaving
                             ? (isEditMode ? 'Updating...' : 'Saving...')
                             : (isEditMode ? 'Update' : 'Save'),
                         style: const TextStyle(
@@ -405,42 +437,6 @@ class _MedicineModalState extends State<MedicineModal> {
         await _refreshNotificationStatus();
       }
     }
-  }
-
-  // Widget builder for the Green Expandable Headers
-  Widget _buildSectionHeader({
-    required String title,
-    required bool isExpanded,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: sectionHeaderColor,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 15,
-                color: textDark,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            Icon(
-              isExpanded ? Icons.arrow_drop_down : Icons.arrow_right,
-              color: textDark,
-              size: 24,
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   // Widget builder for the standard Input fields (Label + TextField)
@@ -899,13 +895,18 @@ class _MedicineModalState extends State<MedicineModal> {
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
+  void _goToTab(int index) {
+    _tabController.animateTo(index);
+    setState(() {
+      _currentTabIndex = index;
+    });
+  }
+
   void _populateInitialValues() {
     final MedicineRecord? initial = widget.initialMedicine;
     if (initial == null) {
       return;
     }
-
-    _isDosageExpanded = true;
 
     _nameController.text = initial.name;
     _strengthController.text = initial.strength;
