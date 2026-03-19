@@ -88,10 +88,6 @@ class _MedicineDetailsModalState extends State<MedicineDetailsModal> {
                       title: 'Dosage',
                       children: [
                         _buildInfoRow(
-                          'Strength',
-                          _displayValue(widget.medicine.strength),
-                        ),
-                        _buildInfoRow(
                           'Dose amount',
                           _displayValue(widget.medicine.doseAmount),
                         ),
@@ -115,32 +111,11 @@ class _MedicineDetailsModalState extends State<MedicineDetailsModal> {
                           'Reminder time',
                           _buildReminderTimeText(context),
                         ),
-                        _buildInfoRow(
-                          'Expires on',
-                          _formatDate(widget.medicine.expirationDate),
-                        ),
-                      ],
-                    ),
-                    _buildInfoCard(
-                      title: 'Inventory',
-                      children: [
-                        _buildInfoRow(
-                          'Current stock',
-                          widget.medicine.currentStock?.toString() ?? 'Not set',
-                        ),
-                        _buildInfoRow(
-                          'Low stock alert',
-                          widget.medicine.alarmStock?.toString() ?? 'Not set',
-                        ),
                       ],
                     ),
                     _buildInfoCard(
                       title: 'Notes',
                       children: [
-                        _buildInfoRow(
-                          'Details',
-                          _displayValue(widget.medicine.details),
-                        ),
                         _buildInfoRow(
                           'Saved on',
                           _formatDateTime(context, widget.medicine.createdAt),

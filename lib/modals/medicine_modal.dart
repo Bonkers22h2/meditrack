@@ -19,17 +19,12 @@ class _MedicineModalState extends State<MedicineModal>
   late final TabController _tabController;
 
   final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _strengthController = TextEditingController();
-  final TextEditingController _detailsController = TextEditingController();
   final TextEditingController _doseAmountController = TextEditingController();
   final TextEditingController _frequencyController = TextEditingController();
-  final TextEditingController _currentStockController = TextEditingController();
-  final TextEditingController _alarmStockController = TextEditingController();
 
   DateTime? _reminderStartDate;
   DateTime? _reminderEndDate;
   TimeOfDay? _reminderTime;
-  DateTime? _expirationDate;
   String _selectedIconKey = MedicineIcons.defaultIconKey;
   bool _isSaving = false;
   bool? _notificationsEnabled;
@@ -48,7 +43,7 @@ class _MedicineModalState extends State<MedicineModal>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this)
+    _tabController = TabController(length: 2, vsync: this)
       ..addListener(() {
         if (_tabController.indexIsChanging) {
           setState(() {
@@ -64,12 +59,8 @@ class _MedicineModalState extends State<MedicineModal>
   void dispose() {
     _tabController.dispose();
     _nameController.dispose();
-    _strengthController.dispose();
-    _detailsController.dispose();
     _doseAmountController.dispose();
     _frequencyController.dispose();
-    _currentStockController.dispose();
-    _alarmStockController.dispose();
     super.dispose();
   }
 
@@ -186,7 +177,6 @@ class _MedicineModalState extends State<MedicineModal>
                       tabs: const [
                         Tab(text: 'Details'),
                         Tab(text: 'Dosage'),
-                        Tab(text: 'Inventory'),
                       ],
                     ),
                   ),
@@ -245,7 +235,7 @@ class _MedicineModalState extends State<MedicineModal>
                             onPressed: _isSaving
                                 ? null
                                 : () {
-                                    if (_currentTabIndex < 2) {
+                                    if (_currentTabIndex < 1) {
                                       _goToTab(_currentTabIndex + 1);
                                       return;
                                     }
@@ -261,7 +251,7 @@ class _MedicineModalState extends State<MedicineModal>
                               elevation: 0,
                             ),
                             child: Text(
-                              _currentTabIndex < 2
+                              _currentTabIndex < 1
                                   ? 'Next'
                                   : _isSaving
                                   ? (isEditMode ? 'Updating...' : 'Saving...')
@@ -298,16 +288,6 @@ class _MedicineModalState extends State<MedicineModal>
                 hint: 'Name..',
                 controller: _nameController,
               ),
-              _buildInputGroup(
-                label: 'Strength',
-                hint: '500mg..',
-                controller: _strengthController,
-              ),
-              _buildInputGroup(
-                label: 'Details',
-                hint: 'For Diabetes..',
-                controller: _detailsController,
-              ),
             ],
           ),
         );
@@ -332,29 +312,8 @@ class _MedicineModalState extends State<MedicineModal>
             ],
           ),
         );
-      case 2:
       default:
-        return SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildInputGroup(
-                label: 'Current stock',
-                hint: 'Total medicine..',
-                controller: _currentStockController,
-                keyboardType: TextInputType.number,
-              ),
-              _buildInputGroup(
-                label: 'Alarm when Stock hits:',
-                hint: '1..',
-                controller: _alarmStockController,
-                keyboardType: TextInputType.number,
-              ),
-              _buildExpirationDateGroup(),
-            ],
-          ),
-        );
+        return const SizedBox.shrink();
     }
   }
 
@@ -651,65 +610,6 @@ class _MedicineModalState extends State<MedicineModal>
     );
   }
 
-  Widget _buildExpirationDateGroup() {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Expiration Date',
-            style: TextStyle(
-              fontSize: 14,
-              color: textDark,
-              fontWeight: FontWeight.w400,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: inputBgColor,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Select:',
-                  style: TextStyle(fontSize: 15, color: textDark),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    GestureDetector(
-                      onTap: _selectExpirationDate,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF0F0F0),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          _formatDate(_expirationDate) ?? 'Select date',
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Future<void> _saveMedicine() async {
     if (_nameController.text.trim().isEmpty) {
       _showSnackBar('Medication name is required');
@@ -767,16 +667,11 @@ class _MedicineModalState extends State<MedicineModal>
     final MedicineRecord record = MedicineRecord(
       iconKey: _selectedIconKey,
       name: _nameController.text.trim(),
-      strength: _strengthController.text.trim(),
-      details: _detailsController.text.trim(),
       doseAmount: _doseAmountController.text.trim(),
       frequency: _frequencyController.text.trim(),
       specificTime: reminderDateTime,
       reminderStartDate: _reminderStartDate,
       reminderEndDate: _reminderEndDate,
-      currentStock: int.tryParse(_currentStockController.text.trim()),
-      alarmStock: int.tryParse(_alarmStockController.text.trim()),
-      expirationDate: _expirationDate,
       createdAt: widget.initialMedicine?.createdAt ?? DateTime.now(),
     );
 
@@ -848,16 +743,11 @@ class _MedicineModalState extends State<MedicineModal>
   void _clearForm() {
     setState(() {
       _nameController.clear();
-      _strengthController.clear();
-      _detailsController.clear();
       _doseAmountController.clear();
       _frequencyController.clear();
-      _currentStockController.clear();
-      _alarmStockController.clear();
       _reminderStartDate = null;
       _reminderEndDate = null;
       _reminderTime = null;
-      _expirationDate = null;
       _selectedIconKey = MedicineIcons.defaultIconKey;
     });
   }
@@ -958,26 +848,6 @@ class _MedicineModalState extends State<MedicineModal>
     });
   }
 
-  Future<void> _selectExpirationDate() async {
-    final DateTime now = DateTime.now();
-    final DateTime initialDate = _expirationDate ?? now;
-
-    final DateTime? selectedDate = await showDatePicker(
-      context: context,
-      initialDate: initialDate,
-      firstDate: DateTime(now.year - 1),
-      lastDate: DateTime(now.year + 10),
-    );
-
-    if (selectedDate == null) {
-      return;
-    }
-
-    setState(() {
-      _expirationDate = selectedDate;
-    });
-  }
-
   String? _formatDate(DateTime? dateTime) {
     if (dateTime == null) {
       return null;
@@ -1033,12 +903,8 @@ class _MedicineModalState extends State<MedicineModal>
 
     _selectedIconKey = initial.iconKey;
     _nameController.text = initial.name;
-    _strengthController.text = initial.strength;
-    _detailsController.text = initial.details;
     _doseAmountController.text = initial.doseAmount;
     _frequencyController.text = initial.frequency;
-    _currentStockController.text = initial.currentStock?.toString() ?? '';
-    _alarmStockController.text = initial.alarmStock?.toString() ?? '';
 
     final DateTime? fallbackReminderDate = initial.specificTime == null
         ? null
@@ -1057,6 +923,5 @@ class _MedicineModalState extends State<MedicineModal>
         minute: initial.specificTime!.minute,
       );
     }
-    _expirationDate = initial.expirationDate;
   }
 }

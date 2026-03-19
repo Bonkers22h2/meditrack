@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:meditrack/modals/medicine_details_modal.dart';
 import 'package:meditrack/modals/medicine_modal.dart';
+import 'package:meditrack/pages/stocks.dart';
 import 'package:meditrack/services/medicine_icons.dart';
 import 'package:meditrack/services/medicine_storage.dart';
 
@@ -100,9 +101,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final String dose = medicine.doseAmount.trim();
     final String frequency = medicine.frequency.trim();
     if (dose.isEmpty && frequency.isEmpty) {
-      return medicine.strength.isEmpty
-          ? 'No dosage details'
-          : medicine.strength;
+      return 'No dosage details';
     }
 
     if (dose.isEmpty) {
@@ -264,6 +263,45 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ),
                 ],
+              ),
+
+              const SizedBox(height: 14),
+
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (BuildContext context) => const StockScreen(),
+                      ),
+                    );
+                  },
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: textFaint.withOpacity(0.35)),
+                    backgroundColor: cardColor,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  icon: Icon(
+                    Icons.inventory_2_outlined,
+                    color: textDark,
+                    size: 18,
+                  ),
+                  label: Text(
+                    'Go to Stock',
+                    style: TextStyle(
+                      color: textDark,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
               ),
 
               const SizedBox(height: 20),

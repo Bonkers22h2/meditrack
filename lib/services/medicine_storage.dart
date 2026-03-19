@@ -8,39 +8,27 @@ class MedicineRecord {
   MedicineRecord({
     this.iconKey = MedicineIcons.defaultIconKey,
     required this.name,
-    required this.strength,
-    required this.details,
     required this.doseAmount,
     required this.frequency,
     this.specificTime,
     this.reminderStartDate,
     this.reminderEndDate,
-    this.currentStock,
-    this.alarmStock,
-    this.expirationDate,
     required this.createdAt,
   });
 
   final String iconKey;
   final String name;
-  final String strength;
-  final String details;
   final String doseAmount;
   final String frequency;
   final DateTime? specificTime;
   final DateTime? reminderStartDate;
   final DateTime? reminderEndDate;
-  final int? currentStock;
-  final int? alarmStock;
-  final DateTime? expirationDate;
   final DateTime createdAt;
 
   factory MedicineRecord.fromJson(Map<String, dynamic> json) {
     return MedicineRecord(
       iconKey: (json['iconKey'] as String?) ?? MedicineIcons.defaultIconKey,
       name: (json['name'] as String?) ?? '',
-      strength: (json['strength'] as String?) ?? '',
-      details: (json['details'] as String?) ?? '',
       doseAmount: (json['doseAmount'] as String?) ?? '',
       frequency: (json['frequency'] as String?) ?? '',
       specificTime: _tryParseDateTime(json['specificTime'] as String?),
@@ -48,9 +36,6 @@ class MedicineRecord {
         json['reminderStartDate'] as String?,
       ),
       reminderEndDate: _tryParseDateTime(json['reminderEndDate'] as String?),
-      currentStock: json['currentStock'] as int?,
-      alarmStock: json['alarmStock'] as int?,
-      expirationDate: _tryParseDateTime(json['expirationDate'] as String?),
       createdAt:
           _tryParseDateTime(json['createdAt'] as String?) ?? DateTime.now(),
     );
@@ -60,16 +45,11 @@ class MedicineRecord {
     return <String, dynamic>{
       'iconKey': iconKey,
       'name': name,
-      'strength': strength,
-      'details': details,
       'doseAmount': doseAmount,
       'frequency': frequency,
       'specificTime': specificTime?.toIso8601String(),
       'reminderStartDate': reminderStartDate?.toIso8601String(),
       'reminderEndDate': reminderEndDate?.toIso8601String(),
-      'currentStock': currentStock,
-      'alarmStock': alarmStock,
-      'expirationDate': expirationDate?.toIso8601String(),
       'createdAt': createdAt.toIso8601String(),
     };
   }
