@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:meditrack/services/medicine_icons.dart';
 import 'package:meditrack/services/notification_service.dart';
 import 'package:meditrack/services/medicine_storage.dart';
+import 'package:meditrack/services/stock_storage.dart';
 
 class MedicineModal extends StatefulWidget {
   const MedicineModal({super.key, this.initialMedicine});
@@ -27,6 +28,9 @@ class _MedicineModalState extends State<MedicineModal>
   TimeOfDay? _reminderTime;
   String _selectedIconKey = MedicineIcons.defaultIconKey;
   bool _isSaving = false;
+  List<String> _stockMedicineNames = <String>[];
+  Map<String, int> _stockCountByMedicine = <String, int>{};
+  bool _isLoadingStockNames = true;
   bool? _notificationsEnabled;
   bool _isCheckingNotificationStatus = true;
   bool _isSendingTestNotification = false;
@@ -52,6 +56,7 @@ class _MedicineModalState extends State<MedicineModal>
         }
       });
     _populateInitialValues();
+    _loadMedicineNamesFromStocks();
     _refreshNotificationStatus();
   }
 
@@ -282,13 +287,7 @@ class _MedicineModalState extends State<MedicineModal>
           padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildInputGroup(
-                label: 'Medication name',
-                hint: 'Name..',
-                controller: _nameController,
-              ),
-            ],
+            children: [_buildMedicationDropdownGroup()],
           ),
         );
       case 1:
@@ -612,7 +611,7 @@ class _MedicineModalState extends State<MedicineModal>
 
   Future<void> _saveMedicine() async {
     if (_nameController.text.trim().isEmpty) {
-      _showSnackBar('Medication name is required');
+      _showSnackBar('Select a medication from Stocks first.');
       return;
     }
 
@@ -742,7 +741,9 @@ class _MedicineModalState extends State<MedicineModal>
 
   void _clearForm() {
     setState(() {
-      _nameController.clear();
+      _nameController.text = _stockMedicineNames.isNotEmpty
+          ? _stockMedicineNames.first
+          : '';
       _doseAmountController.clear();
       _frequencyController.clear();
       _reminderStartDate = null;
@@ -893,6 +894,115 @@ class _MedicineModalState extends State<MedicineModal>
     setState(() {
       _currentTabIndex = index;
     });
+  }
+
+  Future<void> _loadMedicineNamesFromStocks() async {
+    final List<StockRecord> stocks = await StockStorage.loadStocks();
+    final Map<String, int> stockCountByMedicine = <String, int>{};
+    for (final StockRecord stock in stocks) {
+      final String name = stock.medicineName.trim();
+      if (name.isNotEmpty) {
+        stockCountByMedicine[name] =
+            (stockCountByMedicine[name] ?? 0) + stock.currentStock;
+      }
+    }
+
+    final List<String> stockNames = stockCountByMedicine.keys.toList()..sort();
+    final String initialName = _nameController.text.trim();
+    if (initialName.isNotEmpty && !stockNames.contains(initialName)) {
+      stockNames.insert(0, initialName);
+      stockCountByMedicine[initialName] =
+          stockCountByMedicine[initialName] ?? 0;
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _stockMedicineNames = stockNames;
+      _stockCountByMedicine = stockCountByMedicine;
+      _isLoadingStockNames = false;
+      if (_nameController.text.trim().isEmpty && stockNames.isNotEmpty) {
+        _nameController.text = stockNames.first;
+      }
+    });
+  }
+
+  Widget _buildMedicationDropdownGroup() {
+    final String selectedName = _nameController.text.trim();
+    final bool hasStocks = _stockMedicineNames.isNotEmpty;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Medication name',
+            style: TextStyle(
+              fontSize: 14,
+              color: textDark,
+              fontWeight: FontWeight.w400,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            decoration: BoxDecoration(
+              color: inputBgColor,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: _isLoadingStockNames
+                ? const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    child: SizedBox(
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                : DropdownButtonFormField<String>(
+                    initialValue: hasStocks && selectedName.isNotEmpty
+                        ? selectedName
+                        : null,
+                    items: _stockMedicineNames
+                        .map(
+                          (String name) => DropdownMenuItem<String>(
+                            value: name,
+                            child: Text(
+                              '$name (${_stockCountByMedicine[name] ?? 0} left)',
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: hasStocks
+                        ? (String? value) {
+                            if (value == null) {
+                              return;
+                            }
+                            setState(() {
+                              _nameController.text = value;
+                            });
+                          }
+                        : null,
+                    decoration: InputDecoration(
+                      hintText: hasStocks
+                          ? 'Select medication'
+                          : 'No stocks found. Add medication in Stocks page.',
+                      hintStyle: TextStyle(color: textHint),
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
+                      isDense: true,
+                    ),
+                    icon: const Icon(Icons.keyboard_arrow_down_rounded),
+                  ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _populateInitialValues() {
