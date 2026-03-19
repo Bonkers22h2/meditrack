@@ -4,6 +4,7 @@ import 'package:meditrack/modals/medicine_modal.dart';
 import 'package:meditrack/pages/stocks.dart';
 import 'package:meditrack/services/medicine_icons.dart';
 import 'package:meditrack/services/medicine_storage.dart';
+import 'package:meditrack/services/stock_storage.dart';
 
 void main() {
   runApp(const MeditrackApp());
@@ -35,6 +36,7 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   List<MedicineRecord> _medicines = <MedicineRecord>[];
+  int _stockCount = 0;
   bool _isLoading = true;
   DateTime _selectedDate = DateTime.now();
 
@@ -54,6 +56,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     _loadMedicines();
+    _loadStocks();
   }
 
   Future<void> _loadMedicines() async {
@@ -66,6 +69,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
     setState(() {
       _medicines = medicines.reversed.toList();
       _isLoading = false;
+    });
+  }
+
+  Future<void> _loadStocks() async {
+    final List<StockRecord> stocks = await StockStorage.loadStocks();
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _stockCount = stocks.length;
     });
   }
 
@@ -276,7 +290,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       MaterialPageRoute(
                         builder: (BuildContext context) => const StockScreen(),
                       ),
-                    );
+                    ).then((_) => _loadStocks());
                   },
                   style: OutlinedButton.styleFrom(
                     side: BorderSide(color: textFaint.withOpacity(0.35)),
@@ -301,6 +315,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              Text(
+                '$_stockCount stock item${_stockCount == 1 ? '' : 's'} tracked',
+                style: TextStyle(
+                  color: textFaint,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
 

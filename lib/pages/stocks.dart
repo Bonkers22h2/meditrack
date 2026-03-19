@@ -1,7 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:meditrack/modals/stock_modal.dart';
+import 'package:meditrack/services/stock_storage.dart';
 
-class StockScreen extends StatelessWidget {
+class StockScreen extends StatefulWidget {
   const StockScreen({super.key});
+
+  @override
+  State<StockScreen> createState() => _StockScreenState();
+}
+
+class _StockScreenState extends State<StockScreen> {
+  List<StockRecord> _stocks = <StockRecord>[];
+  bool _isLoading = true;
 
   // Reusing the core colors
   final Color backgroundColor = const Color(0xFFF4F5F0);
@@ -17,6 +27,121 @@ class StockScreen extends StatelessWidget {
   final Color lowStockColor = const Color(0xFFFFC4CD); // Pastel Pink
   final Color refillSoonColor = const Color(0xFFFFF1BD); // Pastel Yellow
   final Color inStockColor = const Color(0xFFC0E5C4); // Pastel Green
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStocks();
+  }
+
+  Future<void> _loadStocks() async {
+    final List<StockRecord> records = await StockStorage.loadStocks();
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _stocks = records.reversed.toList();
+      _isLoading = false;
+    });
+  }
+
+  Future<void> _openAddStockModal() async {
+    final StockRecord? newStock = await showDialog<StockRecord>(
+      context: context,
+      builder: (BuildContext context) => const StockEditModal(),
+    );
+
+    if (newStock == null) {
+      return;
+    }
+
+    await StockStorage.addStock(newStock);
+    await _loadStocks();
+  }
+
+  Future<void> _openEditStockModal(StockRecord record) async {
+    final StockRecord? updatedStock = await showDialog<StockRecord>(
+      context: context,
+      builder: (BuildContext context) => StockEditModal(initialRecord: record),
+    );
+
+    if (updatedStock == null) {
+      return;
+    }
+
+    await StockStorage.upsertStock(updatedStock);
+    await _loadStocks();
+  }
+
+  String _dosesText(int count) {
+    return '$count dose${count == 1 ? '' : 's'} left';
+  }
+
+  Widget _buildStockListBySection() {
+    if (_isLoading) {
+      return const Padding(
+        padding: EdgeInsets.only(top: 40),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_stocks.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 32),
+        child: Text(
+          'No stock items yet. Tap Add Medication to create one.',
+          style: TextStyle(
+            color: textFaint,
+            fontSize: 15,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      );
+    }
+
+    final List<StockRecord> lowStock = _stocks
+        .where((StockRecord stock) => stock.isLowStock)
+        .toList();
+    final List<StockRecord> refillSoon = _stocks
+        .where((StockRecord stock) => stock.isRefillSoon)
+        .toList();
+    final List<StockRecord> inStock = _stocks
+        .where((StockRecord stock) => !stock.isLowStock && !stock.isRefillSoon)
+        .toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionTitle('Low Stock'),
+        ...lowStock.map(
+          (StockRecord stock) => _buildMedicineCard(
+            stock: stock,
+            doses: _dosesText(stock.currentStock),
+            bgColor: lowStockColor,
+          ),
+        ),
+        const SizedBox(height: 8),
+        _buildSectionTitle('Refill Soon'),
+        ...refillSoon.map(
+          (StockRecord stock) => _buildMedicineCard(
+            stock: stock,
+            doses: _dosesText(stock.currentStock),
+            bgColor: refillSoonColor,
+          ),
+        ),
+        const SizedBox(height: 8),
+        _buildSectionTitle('In Stock'),
+        ...inStock.map(
+          (StockRecord stock) => _buildMedicineCard(
+            stock: stock,
+            doses: _dosesText(stock.currentStock),
+            bgColor: inStockColor,
+          ),
+        ),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -36,6 +161,16 @@ class StockScreen extends StatelessWidget {
                 children: [
                   Row(
                     children: [
+                      IconButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: Icon(
+                          Icons.arrow_back_ios_new_rounded,
+                          color: textDark,
+                          size: 20,
+                        ),
+                        tooltip: 'Back to dashboard',
+                        splashRadius: 20,
+                      ),
                       Icon(Icons.wb_sunny_outlined, color: textFaint, size: 22),
                       const SizedBox(width: 8),
                       Text(
@@ -89,48 +224,31 @@ class StockScreen extends StatelessWidget {
 
               const SizedBox(height: 16),
 
-              // 3. Low Stock Section
-              _buildSectionTitle('Low Stock'),
-              _buildMedicineCard(
-                name: 'Medicine 1',
-                doses: '2 doses left',
-                bgColor: lowStockColor,
-                showExpiring: false,
-              ),
-              _buildMedicineCard(
-                name: 'Medicine 4',
-                doses: '3 doses left',
-                bgColor: lowStockColor,
-                showExpiring: false,
-              ),
-
-              const SizedBox(height: 8),
-
-              // 4. Refill Soon Section
-              _buildSectionTitle('Refill Soon'),
-              _buildMedicineCard(
-                name: 'Medicine 2',
-                doses: '7 doses left',
-                bgColor: refillSoonColor,
-                showExpiring: true, // Shows the warning icon
+              Align(
+                alignment: Alignment.centerLeft,
+                child: ElevatedButton.icon(
+                  onPressed: _openAddStockModal,
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add Medication'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: cardColor,
+                    foregroundColor: textDark,
+                    elevation: 0,
+                    side: BorderSide(color: textFaint.withOpacity(0.35)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                  ),
+                ),
               ),
 
               const SizedBox(height: 8),
 
-              // 5. In Stock Section
-              _buildSectionTitle('In Stock'),
-              _buildMedicineCard(
-                name: 'Medicine 3',
-                doses: '20 doses left',
-                bgColor: inStockColor,
-                showExpiring: false,
-              ),
-              _buildMedicineCard(
-                name: 'Medicine 5',
-                doses: '23 doses left',
-                bgColor: inStockColor,
-                showExpiring: true, // Shows the warning icon
-              ),
+              _buildStockListBySection(),
 
               const SizedBox(height: 24),
 
@@ -201,88 +319,94 @@ class StockScreen extends StatelessWidget {
 
   // Helper method for the Medicine Pill Cards
   Widget _buildMedicineCard({
-    required String name,
+    required StockRecord stock,
     required String doses,
     required Color bgColor,
-    required bool showExpiring,
   }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12.0),
-      padding: const EdgeInsets.fromLTRB(20, 16, 24, 16),
-      decoration: BoxDecoration(
-        color: bgColor,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
         borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          // Expiring Alert Icon
-          if (showExpiring) ...[
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.warning_amber_rounded, color: textDark, size: 20),
-                Text(
-                  'Expiring',
-                  style: TextStyle(
-                    fontSize: 8,
-                    color: textDark,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(width: 12),
-          ],
-
-          // Medicine Name
-          Text(
-            name,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-              color: textDark,
-            ),
-          ),
-
-          const SizedBox(width: 16),
-
-          // Doses Left (Uses Monospace font for typewriter effect)
-          Text(
-            doses,
-            style: const TextStyle(
-              fontFamily: 'monospace', // Gives exactly that faded tracking look
-              color: Color(0xFF8C8C8C),
-              fontSize: 13,
-            ),
-          ),
-
-          const Spacer(),
-
-          // Refill Button Area
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.add, size: 32, color: textDark),
-              Text(
-                'Refill',
-                style: TextStyle(
-                  fontSize: 10,
-                  color: textDark,
-                  fontWeight: FontWeight.w500,
-                  letterSpacing: 0.5,
-                ),
+        onTap: () => _openEditStockModal(stock),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 12.0),
+          padding: const EdgeInsets.fromLTRB(20, 16, 24, 16),
+          decoration: BoxDecoration(
+            color: bgColor,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
-        ],
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              if (stock.isExpiringSoon) ...[
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.warning_amber_rounded,
+                      color: textDark,
+                      size: 20,
+                    ),
+                    Text(
+                      'Expiring',
+                      style: TextStyle(
+                        fontSize: 8,
+                        color: textDark,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 12),
+              ],
+
+              Text(
+                stock.medicineName,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: textDark,
+                ),
+              ),
+
+              const SizedBox(width: 16),
+
+              Text(
+                doses,
+                style: const TextStyle(
+                  fontFamily: 'monospace',
+                  color: Color(0xFF8C8C8C),
+                  fontSize: 13,
+                ),
+              ),
+
+              const Spacer(),
+
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.edit, size: 24, color: textDark),
+                  Text(
+                    'Edit',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: textDark,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
