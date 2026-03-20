@@ -338,6 +338,7 @@ class _MedicineDetailsModalState extends State<MedicineDetailsModal> {
     final bool? didUpdate = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (BuildContext context) {
         return MedicineModal(initialMedicine: widget.medicine);

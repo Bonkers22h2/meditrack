@@ -72,7 +72,11 @@ class _MedicineModalState extends State<MedicineModal>
   @override
   Widget build(BuildContext context) {
     final bool isEditMode = widget.initialMedicine != null;
+    final MediaQueryData mediaQuery = MediaQuery.of(context);
     final double maxModalHeight = MediaQuery.of(context).size.height * 0.9;
+    final double bottomInset = mediaQuery.viewInsets.bottom > 0
+        ? mediaQuery.viewInsets.bottom
+        : mediaQuery.viewPadding.bottom;
 
     // Wrap in a GestureDetector to dismiss keyboard on tap outside
     return GestureDetector(
@@ -80,10 +84,8 @@ class _MedicineModalState extends State<MedicineModal>
       child: AnimatedPadding(
         duration: const Duration(milliseconds: 150),
         curve: Curves.easeOut,
-        // Adjust for system keyboard
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-        ),
+        // Keep content above keyboard and system navigation bar.
+        padding: EdgeInsets.only(bottom: bottomInset),
         child: Align(
           alignment: Alignment.bottomCenter,
           child: ConstrainedBox(
@@ -961,34 +963,31 @@ class _MedicineModalState extends State<MedicineModal>
                       child: CircularProgressIndicator(strokeWidth: 2),
                     ),
                   )
-                : DropdownButtonFormField<String>(
-                    initialValue: hasStocks && selectedName.isNotEmpty
-                        ? selectedName
-                        : null,
+                : hasStocks
+                ? DropdownButtonFormField<String>(
+                    initialValue: selectedName.isNotEmpty ? selectedName : null,
+                    isExpanded: true,
                     items: _stockMedicineNames
                         .map(
                           (String name) => DropdownMenuItem<String>(
                             value: name,
                             child: Text(
                               '$name (${_stockCountByMedicine[name] ?? 0} left)',
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         )
                         .toList(),
-                    onChanged: hasStocks
-                        ? (String? value) {
-                            if (value == null) {
-                              return;
-                            }
-                            setState(() {
-                              _nameController.text = value;
-                            });
-                          }
-                        : null,
+                    onChanged: (String? value) {
+                      if (value == null) {
+                        return;
+                      }
+                      setState(() {
+                        _nameController.text = value;
+                      });
+                    },
                     decoration: InputDecoration(
-                      hintText: hasStocks
-                          ? 'Select medication'
-                          : 'No stocks found. Add medication in Stocks page.',
+                      hintText: 'Select medication',
                       hintStyle: TextStyle(color: textHint),
                       border: InputBorder.none,
                       contentPadding: const EdgeInsets.symmetric(
@@ -998,6 +997,16 @@ class _MedicineModalState extends State<MedicineModal>
                       isDense: true,
                     ),
                     icon: const Icon(Icons.keyboard_arrow_down_rounded),
+                  )
+                : Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
+                    child: Text(
+                      'No stocks found. Add medication in Stocks page.',
+                      style: TextStyle(color: textHint),
+                    ),
                   ),
           ),
         ],

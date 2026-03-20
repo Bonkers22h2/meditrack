@@ -87,6 +87,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final bool? didSave = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (BuildContext context) => const MedicineModal(),
     );
@@ -100,6 +101,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final bool? didChange = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (BuildContext context) {
         return MedicineDetailsModal(medicine: medicine);
