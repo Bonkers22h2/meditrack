@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -124,5 +125,42 @@ class StockStorage {
           stock.createdAt.isAtSameMomentAs(stockToDelete.createdAt),
     );
     await saveStocks(stocks);
+  }
+
+  static Future<bool> deductStockForMedicine({
+    required String medicineName,
+    required int amount,
+  }) async {
+    if (amount <= 0) {
+      return false;
+    }
+
+    final String normalizedName = medicineName.trim().toLowerCase();
+    if (normalizedName.isEmpty) {
+      return false;
+    }
+
+    final List<StockRecord> stocks = await loadStocks();
+    final int index = stocks.indexWhere(
+      (StockRecord stock) =>
+          stock.medicineName.trim().toLowerCase() == normalizedName,
+    );
+
+    if (index < 0) {
+      return false;
+    }
+
+    final StockRecord existing = stocks[index];
+    final int updatedStock = max(0, existing.currentStock - amount);
+    stocks[index] = StockRecord(
+      medicineName: existing.medicineName,
+      currentStock: updatedStock,
+      lowStockThreshold: existing.lowStockThreshold,
+      expiryDate: existing.expiryDate,
+      createdAt: existing.createdAt,
+    );
+
+    await saveStocks(stocks);
+    return true;
   }
 }

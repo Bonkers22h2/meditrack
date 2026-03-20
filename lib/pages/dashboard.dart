@@ -5,6 +5,7 @@ import 'package:meditrack/pages/stocks.dart';
 import 'package:meditrack/services/medicine_icons.dart';
 import 'package:meditrack/services/medicine_storage.dart';
 import 'package:meditrack/services/stock_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   runApp(const MeditrackApp());
@@ -35,7 +36,12 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  static const String _takenRemindersStorageKey = 'taken_reminders_v1';
+  static const String _deductedRemindersStorageKey = 'deducted_reminders_v1';
+
   List<MedicineRecord> _medicines = <MedicineRecord>[];
+  Set<String> _takenReminderKeys = <String>{};
+  Set<String> _deductedReminderKeys = <String>{};
   int _stockCount = 0;
   bool _isLoading = true;
   DateTime _selectedDate = DateTime.now();
@@ -57,6 +63,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.initState();
     _loadMedicines();
     _loadStocks();
+    _loadReminderCompletionState();
   }
 
   Future<void> _loadMedicines() async {
@@ -81,6 +88,95 @@ class _DashboardScreenState extends State<DashboardScreen> {
     setState(() {
       _stockCount = stocks.length;
     });
+  }
+
+  Future<void> _loadReminderCompletionState() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final List<String> taken =
+        prefs.getStringList(_takenRemindersStorageKey) ?? <String>[];
+    final List<String> deducted =
+        prefs.getStringList(_deductedRemindersStorageKey) ?? <String>[];
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _takenReminderKeys = taken.toSet();
+      _deductedReminderKeys = deducted.toSet();
+    });
+  }
+
+  Future<void> _persistReminderCompletionState() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(
+      _takenRemindersStorageKey,
+      _takenReminderKeys.toList(),
+    );
+    await prefs.setStringList(
+      _deductedRemindersStorageKey,
+      _deductedReminderKeys.toList(),
+    );
+  }
+
+  String _dateStorageKey(DateTime date) {
+    final String month = date.month.toString().padLeft(2, '0');
+    final String day = date.day.toString().padLeft(2, '0');
+    return '${date.year}-$month-$day';
+  }
+
+  String _reminderStorageKey(_ReminderInstance reminder, DateTime date) {
+    return '${reminder.medicine.createdAt.toIso8601String()}_${_dateStorageKey(date)}_${reminder.time.hour}_${reminder.time.minute}';
+  }
+
+  int _extractDoseCount(String doseAmount) {
+    final RegExpMatch? match = RegExp(r'\d+').firstMatch(doseAmount);
+    if (match == null) {
+      return 1;
+    }
+    return int.tryParse(match.group(0)!) ?? 1;
+  }
+
+  Future<void> _markReminderAsTaken(_ReminderInstance reminder) async {
+    final DateTime today = DateTime.now();
+    if (!_isSameDay(_selectedDate, today)) {
+      return;
+    }
+
+    final String storageKey = _reminderStorageKey(reminder, _selectedDate);
+    if (_takenReminderKeys.contains(storageKey)) {
+      return;
+    }
+
+    setState(() {
+      _takenReminderKeys.add(storageKey);
+    });
+
+    final int doseCount = _extractDoseCount(reminder.medicine.doseAmount);
+    bool deducted = false;
+    if (!_deductedReminderKeys.contains(storageKey)) {
+      deducted = await StockStorage.deductStockForMedicine(
+        medicineName: reminder.medicine.name,
+        amount: doseCount,
+      );
+      if (deducted) {
+        _deductedReminderKeys.add(storageKey);
+        await _loadStocks();
+      }
+    }
+
+    await _persistReminderCompletionState();
+
+    if (!mounted) {
+      return;
+    }
+
+    final String message = deducted
+        ? 'Deducted $doseCount pill${doseCount == 1 ? '' : 's'} from ${reminder.medicine.name} stock.'
+        : 'Reminder marked done. No matching stock record found for ${reminder.medicine.name}.';
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _openMedicineModal() async {
@@ -465,6 +561,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildReminderCard(_ReminderInstance reminder) {
     final medicine = reminder.medicine;
+    final bool isToday = _isSameDay(_selectedDate, DateTime.now());
+    final String reminderKey = _reminderStorageKey(reminder, _selectedDate);
+    final bool isChecked = _takenReminderKeys.contains(reminderKey);
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -526,7 +626,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right, color: textFaint, size: 22),
+              Checkbox(
+                value: isChecked,
+                onChanged: (!isToday || isChecked)
+                    ? null
+                    : (bool? value) {
+                        if (value == true) {
+                          _markReminderAsTaken(reminder);
+                        }
+                      },
+                activeColor: const Color(0xFF8BBA91),
+              ),
             ],
           ),
         ),
