@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:meditrack/services/stock_storage.dart';
 
 class StockEditModal extends StatefulWidget {
@@ -25,6 +26,7 @@ class _StockEditModalState extends State<StockEditModal> {
   late int _currentStock;
   late final TextEditingController _medicineNameController;
   late final TextEditingController _lowStockController;
+  late final TextEditingController _currentStockController;
   DateTime? _selectedExpiryDate;
 
   // Colors based on the provided design
@@ -48,6 +50,9 @@ class _StockEditModalState extends State<StockEditModal> {
       text: (initialRecord?.lowStockThreshold ?? widget.lowStockThreshold)
           .toString(),
     );
+    _currentStockController = TextEditingController(
+      text: _currentStock.toString(),
+    );
     _selectedExpiryDate = initialRecord?.expiryDate ?? widget.initialExpiryDate;
   }
 
@@ -55,12 +60,14 @@ class _StockEditModalState extends State<StockEditModal> {
   void dispose() {
     _medicineNameController.dispose();
     _lowStockController.dispose();
+    _currentStockController.dispose();
     super.dispose();
   }
 
   void _incrementStock() {
     setState(() {
       _currentStock++;
+      _currentStockController.text = _currentStock.toString();
     });
   }
 
@@ -68,6 +75,7 @@ class _StockEditModalState extends State<StockEditModal> {
     if (_currentStock > 0) {
       setState(() {
         _currentStock--;
+        _currentStockController.text = _currentStock.toString();
       });
     }
   }
@@ -94,6 +102,7 @@ class _StockEditModalState extends State<StockEditModal> {
   void _saveStock() {
     final String medicineName = _medicineNameController.text.trim();
     final int? lowStock = int.tryParse(_lowStockController.text.trim());
+    final int? currentStock = int.tryParse(_currentStockController.text.trim());
 
     if (medicineName.isEmpty) {
       _showError('Medicine name is required.');
@@ -104,6 +113,13 @@ class _StockEditModalState extends State<StockEditModal> {
       _showError('Low stock threshold must be a valid number.');
       return;
     }
+
+    if (currentStock == null || currentStock < 0) {
+      _showError('Current stock must be a valid number.');
+      return;
+    }
+
+    _currentStock = currentStock;
 
     final StockRecord result = StockRecord(
       medicineName: medicineName,
@@ -341,18 +357,43 @@ class _StockEditModalState extends State<StockEditModal> {
                   ),
                   onPressed: _decrementStock,
                 ),
-                const SizedBox(width: 32),
-                Text(
-                  '$_currentStock',
-                  style: TextStyle(
-                    fontSize: 80,
-                    fontWeight: FontWeight.w500,
-                    fontStyle: FontStyle.italic,
-                    color: textDark,
-                    height: 1.1,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.center,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 120),
+                      child: TextField(
+                        controller: _currentStockController,
+                        keyboardType: TextInputType.number,
+                        textInputAction: TextInputAction.done,
+                        inputFormatters: <TextInputFormatter>[
+                          FilteringTextInputFormatter.digitsOnly,
+                        ],
+                        textAlign: TextAlign.center,
+                        onChanged: (String value) {
+                          final int? parsed = int.tryParse(value);
+                          setState(() {
+                            _currentStock = parsed ?? 0;
+                          });
+                        },
+                        decoration: const InputDecoration(
+                          border: InputBorder.none,
+                          isDense: true,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                        style: TextStyle(
+                          fontSize: 64,
+                          fontWeight: FontWeight.w500,
+                          fontStyle: FontStyle.italic,
+                          color: textDark,
+                          height: 1.1,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-                const SizedBox(width: 32),
+                const SizedBox(width: 12),
                 IconButton(
                   icon: const Icon(Icons.add, size: 36, color: Colors.black87),
                   onPressed: _incrementStock,
