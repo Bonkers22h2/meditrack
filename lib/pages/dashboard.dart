@@ -3,6 +3,7 @@ import 'package:meditrack/modals/medicine_details_modal.dart';
 import 'package:meditrack/modals/medicine_modal.dart';
 import 'package:meditrack/pages/stocks.dart';
 import 'package:meditrack/services/medicine_icons.dart';
+import 'package:meditrack/services/notification_service.dart';
 import 'package:meditrack/services/medicine_storage.dart';
 import 'package:meditrack/services/stock_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -44,6 +45,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Set<String> _deductedReminderKeys = <String>{};
   int _stockCount = 0;
   bool _isLoading = true;
+  bool _isTestingEscalationSound = false;
   DateTime _selectedDate = DateTime.now();
 
   // Updated color palette for better visibility
@@ -152,6 +154,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _takenReminderKeys.add(storageKey);
     });
 
+    final DateTime scheduledAt = DateTime(
+      _selectedDate.year,
+      _selectedDate.month,
+      _selectedDate.day,
+      reminder.time.hour,
+      reminder.time.minute,
+    );
+    try {
+      await NotificationService.cancelEscalatingReminderAttempts(
+        medicineCreatedAtMillis:
+            reminder.medicine.createdAt.millisecondsSinceEpoch,
+        scheduledAt: scheduledAt,
+      );
+    } catch (_) {
+      // Continue local completion flow even if notification cancellation fails.
+    }
+
     final int doseCount = _extractDoseCount(reminder.medicine.doseAmount);
     bool deducted = false;
     if (!_deductedReminderKeys.contains(storageKey)) {
@@ -206,6 +225,64 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     if (didChange == true) {
       await _loadMedicines();
+    }
+  }
+
+  Future<void> _runEscalationSoundTest() async {
+    if (_isTestingEscalationSound) {
+      return;
+    }
+
+    setState(() {
+      _isTestingEscalationSound = true;
+    });
+
+    try {
+      final bool hasAccess =
+          await NotificationService.ensureNotificationAccess();
+      if (!hasAccess) {
+        if (!mounted) {
+          return;
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Notifications are disabled. Enable them in system settings.',
+            ),
+          ),
+        );
+        return;
+      }
+
+      await NotificationService.scheduleEscalationTestSequence(
+        baseNotificationId: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      );
+
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Escalation test scheduled: in 5 seconds, then +10s and +20s.',
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Unable to schedule escalation test right now.'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isTestingEscalationSound = false;
+        });
+      }
     }
   }
 
@@ -408,6 +485,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                   label: Text(
                     'Go to Stock',
+                    style: TextStyle(
+                      color: textDark,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  onPressed: _isTestingEscalationSound
+                      ? null
+                      : _runEscalationSoundTest,
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: textFaint.withOpacity(0.35)),
+                    backgroundColor: cardColor,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  icon: Icon(
+                    Icons.notifications_active_outlined,
+                    color: textDark,
+                    size: 18,
+                  ),
+                  label: Text(
+                    _isTestingEscalationSound
+                        ? 'Scheduling test...'
+                        : 'Test Escalation Sound',
                     style: TextStyle(
                       color: textDark,
                       fontWeight: FontWeight.w600,

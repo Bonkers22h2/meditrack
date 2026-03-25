@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
@@ -10,15 +12,29 @@ class NotificationService {
       FlutterLocalNotificationsPlugin();
 
   static bool _initialized = false;
+  static const int _escalationAttempts = 3;
+  static const int _continuousLevel3Retries = 180;
+  static const int _totalReminderAttempts =
+      _escalationAttempts + _continuousLevel3Retries;
+  static const Duration _escalationInterval = Duration(minutes: 2);
+  static const String _defaultChannelId = 'medicine_reminders_v3';
+  static const String _level1ChannelId = 'medicine_reminders_level_1_v3';
+  static const String _level2ChannelId = 'medicine_reminders_level_2_v3';
+  static const String _level3ChannelId = 'medicine_reminders_level_3_v3';
+  static const String _level1Sound = 'reminder_level_1';
+  static const String _level2Sound = 'reminder_level_2';
+  static const String _level3Sound = 'reminder_level_3';
 
   static const NotificationDetails _defaultNotificationDetails =
       NotificationDetails(
         android: AndroidNotificationDetails(
-          'medicine_reminders',
+          _defaultChannelId,
           'Medicine Reminders',
           channelDescription: 'Reminder notifications for medicine intake',
           importance: Importance.max,
           priority: Priority.high,
+          playSound: true,
+          sound: RawResourceAndroidNotificationSound(_level1Sound),
         ),
         iOS: DarwinNotificationDetails(),
       );
@@ -42,12 +58,23 @@ class NotificationService {
     );
 
     await _plugin.initialize(initSettings);
+    await _createAndroidChannels();
     await _requestPermissions();
     _initialized = true;
   }
 
+  static Future<bool> ensureNotificationAccess() async {
+    if (!_initialized) {
+      await initialize();
+    } else {
+      await _requestPermissions();
+    }
+
+    return areNotificationsEnabled();
+  }
+
   static Future<void> scheduleMedicineReminder({
-    required int notificationId,
+    required int medicineCreatedAtMillis,
     required String medicineName,
     required DateTime scheduledAt,
     String? doseAmount,
@@ -65,16 +92,16 @@ class NotificationService {
         ? 'Time to take your medicine.'
         : 'Time to take $doseAmount of your medicine.';
 
-    await _zonedScheduleWithFallback(
-      notificationId: notificationId,
+    await _scheduleEscalatingReminder(
+      medicineCreatedAtMillis: medicineCreatedAtMillis,
+      scheduledDate: scheduledDate,
       title: 'Medicine Reminder: $medicineName',
       body: body,
-      scheduledDate: scheduledDate,
     );
   }
 
   static Future<int> scheduleMedicineReminderRange({
-    required int baseNotificationId,
+    required int medicineCreatedAtMillis,
     required String medicineName,
     required DateTime startDate,
     required DateTime endDate,
@@ -125,11 +152,11 @@ class NotificationService {
           scheduledAt,
           tz.local,
         );
-        await _zonedScheduleWithFallback(
-          notificationId: baseNotificationId + idOffset,
+        await _scheduleEscalatingReminder(
+          medicineCreatedAtMillis: medicineCreatedAtMillis,
+          scheduledDate: scheduledDate,
           title: 'Medicine Reminder: $medicineName',
           body: body,
-          scheduledDate: scheduledDate,
         );
         scheduledCount += 1;
       }
@@ -177,7 +204,79 @@ class NotificationService {
       title: title,
       body: body,
       scheduledDate: scheduledDate,
+      notificationDetails: _defaultNotificationDetails,
     );
+  }
+
+  static Future<void> scheduleEscalationTestSequence({
+    required int baseNotificationId,
+    Duration initialDelay = const Duration(seconds: 5),
+    Duration stepDelay = const Duration(seconds: 10),
+  }) async {
+    if (!_initialized) {
+      await initialize();
+    }
+
+    final tz.TZDateTime now = tz.TZDateTime.now(tz.local);
+    for (int attempt = 0; attempt < _escalationAttempts; attempt += 1) {
+      await _zonedScheduleWithFallback(
+        notificationId: baseNotificationId + attempt,
+        title: 'Escalation Test ${attempt + 1}/$_escalationAttempts',
+        body: 'Testing reminder sound level ${attempt + 1}.',
+        scheduledDate: now.add(initialDelay + (stepDelay * attempt)),
+        notificationDetails: _notificationDetailsForAttempt(attempt),
+      );
+    }
+  }
+
+  static Future<void> cancelEscalatingReminderAttempts({
+    required int medicineCreatedAtMillis,
+    required DateTime scheduledAt,
+  }) async {
+    if (!_initialized) {
+      await initialize();
+    }
+
+    final String reminderIdentity = _buildReminderIdentity(
+      medicineCreatedAtMillis: medicineCreatedAtMillis,
+      scheduledAt: scheduledAt,
+    );
+
+    for (int attempt = 0; attempt < _totalReminderAttempts; attempt += 1) {
+      await _plugin.cancel(
+        _notificationIdForAttempt(
+          reminderIdentity: reminderIdentity,
+          attempt: attempt,
+        ),
+      );
+    }
+  }
+
+  static Future<void> _scheduleEscalatingReminder({
+    required int medicineCreatedAtMillis,
+    required tz.TZDateTime scheduledDate,
+    required String title,
+    required String body,
+  }) async {
+    final String reminderIdentity = _buildReminderIdentity(
+      medicineCreatedAtMillis: medicineCreatedAtMillis,
+      scheduledAt: scheduledDate,
+    );
+
+    for (int attempt = 0; attempt < _totalReminderAttempts; attempt += 1) {
+      await _zonedScheduleWithFallback(
+        notificationId: _notificationIdForAttempt(
+          reminderIdentity: reminderIdentity,
+          attempt: attempt,
+        ),
+        title: title,
+        body: body,
+        scheduledDate: scheduledDate.add(
+          Duration(minutes: _escalationInterval.inMinutes * attempt),
+        ),
+        notificationDetails: _notificationDetailsForAttempt(attempt),
+      );
+    }
   }
 
   static Future<void> _zonedScheduleWithFallback({
@@ -185,6 +284,7 @@ class NotificationService {
     required String title,
     required String body,
     required tz.TZDateTime scheduledDate,
+    required NotificationDetails notificationDetails,
   }) async {
     try {
       await _plugin.zonedSchedule(
@@ -192,7 +292,7 @@ class NotificationService {
         title,
         body,
         scheduledDate,
-        _defaultNotificationDetails,
+        notificationDetails,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         uiLocalNotificationDateInterpretation:
             UILocalNotificationDateInterpretation.absoluteTime,
@@ -203,7 +303,7 @@ class NotificationService {
         title,
         body,
         scheduledDate,
-        _defaultNotificationDetails,
+        notificationDetails,
         androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
         uiLocalNotificationDateInterpretation:
             UILocalNotificationDateInterpretation.absoluteTime,
@@ -244,6 +344,7 @@ class NotificationService {
           AndroidFlutterLocalNotificationsPlugin
         >();
     await androidPlatform?.requestNotificationsPermission();
+    await androidPlatform?.requestExactAlarmsPermission();
 
     final IOSFlutterLocalNotificationsPlugin? iosPlatform = _plugin
         .resolvePlatformSpecificImplementation<
@@ -264,5 +365,163 @@ class NotificationService {
       badge: true,
       sound: true,
     );
+  }
+
+  static Future<void> _createAndroidChannels() async {
+    final AndroidFlutterLocalNotificationsPlugin? androidPlatform = _plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+
+    if (androidPlatform == null) {
+      return;
+    }
+
+    await androidPlatform.createNotificationChannel(
+      const AndroidNotificationChannel(
+        _defaultChannelId,
+        'Medicine Reminders',
+        description: 'Reminder notifications for medicine intake',
+        importance: Importance.max,
+        playSound: true,
+        sound: RawResourceAndroidNotificationSound(_level1Sound),
+      ),
+    );
+
+    await androidPlatform.createNotificationChannel(
+      const AndroidNotificationChannel(
+        _level1ChannelId,
+        'Medicine Reminders Level 1',
+        description: 'Initial medicine reminder alert',
+        importance: Importance.high,
+        playSound: true,
+        sound: RawResourceAndroidNotificationSound(_level1Sound),
+      ),
+    );
+
+    await androidPlatform.createNotificationChannel(
+      const AndroidNotificationChannel(
+        _level2ChannelId,
+        'Medicine Reminders Level 2',
+        description: 'Follow-up medicine reminder alert',
+        importance: Importance.max,
+        playSound: true,
+        sound: RawResourceAndroidNotificationSound(_level2Sound),
+      ),
+    );
+
+    await androidPlatform.createNotificationChannel(
+      const AndroidNotificationChannel(
+        _level3ChannelId,
+        'Medicine Reminders Level 3',
+        description: 'Urgent follow-up medicine reminder alert',
+        importance: Importance.max,
+        playSound: true,
+        sound: RawResourceAndroidNotificationSound(_level3Sound),
+      ),
+    );
+  }
+
+  static NotificationDetails _notificationDetailsForAttempt(int attempt) {
+    final int safeAttempt = attempt.clamp(0, _escalationAttempts - 1);
+    if (safeAttempt == 0) {
+      return NotificationDetails(
+        android: AndroidNotificationDetails(
+          _level1ChannelId,
+          'Medicine Reminders Level 1',
+          channelDescription: 'Initial medicine reminder alert',
+          importance: Importance.high,
+          priority: Priority.high,
+          playSound: true,
+          sound: RawResourceAndroidNotificationSound(_level1Sound),
+          enableVibration: true,
+          vibrationPattern: Int64List.fromList(<int>[0, 250, 200, 250]),
+        ),
+        iOS: const DarwinNotificationDetails(),
+      );
+    }
+
+    if (safeAttempt == 1) {
+      return NotificationDetails(
+        android: AndroidNotificationDetails(
+          _level2ChannelId,
+          'Medicine Reminders Level 2',
+          channelDescription: 'Follow-up medicine reminder alert',
+          importance: Importance.max,
+          priority: Priority.high,
+          playSound: true,
+          sound: RawResourceAndroidNotificationSound(_level2Sound),
+          enableVibration: true,
+          vibrationPattern: Int64List.fromList(<int>[
+            0,
+            350,
+            150,
+            350,
+            150,
+            350,
+          ]),
+        ),
+        iOS: const DarwinNotificationDetails(
+          interruptionLevel: InterruptionLevel.timeSensitive,
+        ),
+      );
+    }
+
+    return NotificationDetails(
+      android: AndroidNotificationDetails(
+        _level3ChannelId,
+        'Medicine Reminders Level 3',
+        channelDescription: 'Urgent follow-up medicine reminder alert',
+        importance: Importance.max,
+        priority: Priority.max,
+        playSound: true,
+        sound: RawResourceAndroidNotificationSound(_level3Sound),
+        enableVibration: true,
+        category: AndroidNotificationCategory.alarm,
+        fullScreenIntent: true,
+        audioAttributesUsage: AudioAttributesUsage.alarm,
+        vibrationPattern: Int64List.fromList(<int>[
+          0,
+          500,
+          100,
+          500,
+          100,
+          500,
+          100,
+          500,
+        ]),
+      ),
+      iOS: const DarwinNotificationDetails(
+        interruptionLevel: InterruptionLevel.timeSensitive,
+      ),
+    );
+  }
+
+  static String _buildReminderIdentity({
+    required int medicineCreatedAtMillis,
+    required DateTime scheduledAt,
+  }) {
+    final String month = scheduledAt.month.toString().padLeft(2, '0');
+    final String day = scheduledAt.day.toString().padLeft(2, '0');
+    final String hour = scheduledAt.hour.toString().padLeft(2, '0');
+    final String minute = scheduledAt.minute.toString().padLeft(2, '0');
+    return '${medicineCreatedAtMillis}_${scheduledAt.year}$month$day$hour$minute';
+  }
+
+  static int _notificationIdForAttempt({
+    required String reminderIdentity,
+    required int attempt,
+  }) {
+    final int base = 100000000 + (_fnv1a32(reminderIdentity) % 700000000);
+    return base + attempt;
+  }
+
+  static int _fnv1a32(String input) {
+    int hash = 0x811C9DC5;
+    for (int i = 0; i < input.length; i += 1) {
+      hash ^= input.codeUnitAt(i);
+      hash = (hash * 0x01000193) & 0xFFFFFFFF;
+    }
+    return hash & 0x7FFFFFFF;
   }
 }

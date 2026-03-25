@@ -418,6 +418,20 @@ class _MedicineModalState extends State<MedicineModal>
       _isSendingTestNotification = true;
     });
 
+    final bool hasAccess = await NotificationService.ensureNotificationAccess();
+    if (!hasAccess) {
+      if (mounted) {
+        setState(() {
+          _isSendingTestNotification = false;
+        });
+        _showSnackBar(
+          'Notifications are disabled. Enable app notifications in system settings.',
+        );
+        await _refreshNotificationStatus();
+      }
+      return;
+    }
+
     final int notificationId = DateTime.now().millisecondsSinceEpoch ~/ 1000;
     final String medicineName = _nameController.text.trim().isEmpty
         ? 'your medicine'
@@ -694,21 +708,28 @@ class _MedicineModalState extends State<MedicineModal>
 
     if (hasReminderRange) {
       try {
-        final int scheduledCount =
-            await NotificationService.scheduleMedicineReminderRange(
-              baseNotificationId:
-                  record.createdAt.millisecondsSinceEpoch ~/ 1000,
-              medicineName: record.name,
-              startDate: _reminderStartDate!,
-              endDate: _reminderEndDate!,
-              hour: _reminderTime!.hour,
-              minute: _reminderTime!.minute,
-              doseAmount: record.doseAmount,
-            );
-
-        if (scheduledCount == 0) {
+        final bool hasAccess =
+            await NotificationService.ensureNotificationAccess();
+        if (!hasAccess) {
           postSaveMessage =
-              'Medicine saved, but no reminders were scheduled because all selected dates are in the past.';
+              'Medicine saved, but notifications are disabled in system settings.';
+        } else {
+          final int scheduledCount =
+              await NotificationService.scheduleMedicineReminderRange(
+                medicineCreatedAtMillis:
+                    record.createdAt.millisecondsSinceEpoch,
+                medicineName: record.name,
+                startDate: _reminderStartDate!,
+                endDate: _reminderEndDate!,
+                hour: _reminderTime!.hour,
+                minute: _reminderTime!.minute,
+                doseAmount: record.doseAmount,
+              );
+
+          if (scheduledCount == 0) {
+            postSaveMessage =
+                'Medicine saved, but no reminders were scheduled because all selected dates are in the past.';
+          }
         }
       } catch (_) {
         postSaveMessage =
@@ -716,12 +737,19 @@ class _MedicineModalState extends State<MedicineModal>
       }
     } else if (reminderDateTime != null) {
       try {
-        await NotificationService.scheduleMedicineReminder(
-          notificationId: record.createdAt.millisecondsSinceEpoch ~/ 1000,
-          medicineName: record.name,
-          scheduledAt: reminderDateTime,
-          doseAmount: record.doseAmount,
-        );
+        final bool hasAccess =
+            await NotificationService.ensureNotificationAccess();
+        if (!hasAccess) {
+          postSaveMessage =
+              'Medicine saved, but notifications are disabled in system settings.';
+        } else {
+          await NotificationService.scheduleMedicineReminder(
+            medicineCreatedAtMillis: record.createdAt.millisecondsSinceEpoch,
+            medicineName: record.name,
+            scheduledAt: reminderDateTime,
+            doseAmount: record.doseAmount,
+          );
+        }
       } catch (_) {
         postSaveMessage =
             'Medicine saved, but reminder could not be scheduled. Check notification permission.';
