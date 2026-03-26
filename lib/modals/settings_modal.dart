@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:meditrack/services/notification_service.dart';
+import 'package:meditrack/tutorials/tutorial_preferences.dart';
 
 class SettingsModal extends StatefulWidget {
   const SettingsModal({super.key});
@@ -12,6 +13,7 @@ class _SettingsModalState extends State<SettingsModal> {
   bool? _notificationsEnabled;
   bool _isCheckingNotificationStatus = true;
   bool _isTestingEscalationSound = false;
+  bool _isResettingTutorials = false;
 
   @override
   void initState() {
@@ -77,6 +79,31 @@ class _SettingsModalState extends State<SettingsModal> {
       if (mounted) {
         setState(() {
           _isTestingEscalationSound = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _resetTutorials() async {
+    if (_isResettingTutorials) return;
+
+    setState(() {
+      _isResettingTutorials = true;
+    });
+
+    try {
+      await TutorialPreferences.resetAllSeen();
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Tutorials have been reset.')),
+        );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isResettingTutorials = false;
         });
       }
     }
@@ -163,6 +190,34 @@ class _SettingsModalState extends State<SettingsModal> {
                         onPressed: _isTestingEscalationSound
                             ? null
                             : _runEscalationSoundTest,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        icon: Icon(Icons.restart_alt, color: textFaint),
+                        label: Text(
+                          _isResettingTutorials
+                              ? 'Resetting...'
+                              : 'Reset Tutorials',
+                          style: TextStyle(
+                            color: textFaint,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: textFaint.withOpacity(0.35)),
+                          backgroundColor: cardColor,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 14,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        onPressed: _isResettingTutorials ? null : _resetTutorials,
                       ),
                     ),
                   ],

@@ -11,15 +11,15 @@ enum DashboardHelpSection {
 
 List<GlobalKey> buildDashboardTutorialSteps({
   required GlobalKey titleShowcaseKey,
+  required GlobalKey scheduleButtonShowcaseKey,
   required GlobalKey dateSelectorShowcaseKey,
-  required GlobalKey addReminderShowcaseKey,
-  required GlobalKey stockShowcaseKey,
+  required GlobalKey stockTabShowcaseKey,
 }) {
   return <GlobalKey>[
     titleShowcaseKey,
+    scheduleButtonShowcaseKey,
     dateSelectorShowcaseKey,
-    addReminderShowcaseKey,
-    stockShowcaseKey,
+    stockTabShowcaseKey,
   ];
 }
 
@@ -28,13 +28,13 @@ Future<void> startDashboardTutorial({
   required bool Function() isMounted,
   required List<GlobalKey> steps,
 }) async {
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    if (!isMounted()) {
-      return;
-    }
+  await Future<void>.delayed(const Duration(milliseconds: 250));
 
-    ShowCaseWidget.of(context).startShowCase(steps);
-  });
+  if (!isMounted()) {
+    return;
+  }
+
+  ShowCaseWidget.of(context).startShowCase(steps);
 }
 
 Future<void> startDashboardTutorialIfNeeded({
@@ -61,11 +61,11 @@ Future<void> startDashboardTutorialIfNeeded({
 String dashboardHelpSectionTitle(DashboardHelpSection section) {
   switch (section) {
     case DashboardHelpSection.dashboardOverview:
-      return 'Dashboard Overview';
+      return 'Reminders dashboard Overview';
     case DashboardHelpSection.addSchedule:
-      return 'Add a Medication Schedule';
+      return 'Adding a medication schedule';
     case DashboardHelpSection.manageStocks:
-      return 'Manage Medication Stocks';
+      return 'Managing medication stocks';
   }
 }
 
@@ -92,7 +92,7 @@ Future<DashboardHelpSection?> showDashboardHelpSectionsPopup({
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Help Sections',
+                  'Help Center',
                   style: TextStyle(
                     color: textDark,
                     fontWeight: FontWeight.w700,

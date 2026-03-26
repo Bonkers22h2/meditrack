@@ -4,11 +4,13 @@ import 'package:meditrack/modals/medicine_details_modal.dart';
 import 'package:meditrack/modals/medicine_modal.dart';
 import 'package:meditrack/pages/stocks.dart';
 import 'package:meditrack/modals/settings_modal.dart';
+import 'package:meditrack/tutorials/dashboard_tutorial.dart';
+import 'package:meditrack/tutorials/tutorial_preferences.dart';
+import 'package:meditrack/widgets/intro_popup_dialog.dart';
 import 'package:meditrack/services/medicine_icons.dart';
 import 'package:meditrack/services/notification_service.dart';
 import 'package:meditrack/services/medicine_storage.dart';
 import 'package:meditrack/services/stock_storage.dart';
-import 'package:meditrack/tutorials/tutorial_preferences.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:showcaseview/showcaseview.dart';
 
@@ -34,7 +36,12 @@ class MeditrackApp extends StatelessWidget {
 // DASHBOARD SCREEN (Reminders) - UPDATED WITH TIME COLORS
 // ---------------------------------------------------------
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  const DashboardScreen({
+    super.key,
+    this.showFirstLoginSectionsPopup = false,
+  });
+
+  final bool showFirstLoginSectionsPopup;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -46,9 +53,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
   static const String _deductedRemindersStorageKey = 'deducted_reminders_v1';
 
   final GlobalKey _titleShowcaseKey = GlobalKey();
+  final GlobalKey _scheduleButtonShowcaseKey = GlobalKey();
   final GlobalKey _dateSelectorShowcaseKey = GlobalKey();
-  final GlobalKey _addReminderShowcaseKey = GlobalKey();
-  final GlobalKey _stockShowcaseKey = GlobalKey();
+  final GlobalKey _stockTabShowcaseKey = GlobalKey();
+
+  final List<IntroPopupPage> _firstLoginSectionsPages = const <IntroPopupPage>[
+    IntroPopupPage(
+      title: 'Getting Started',
+      description:
+          'Since it’s your first time, we’ll show you the main sections of the app:',
+      steps: <String>[
+        'Reminders: This is where you can set and view your medicine schedules',
+        'Stocks: This is where you can manage your medicine stocks',
+      ],
+      extra:
+          'Tip: If you need help later, tapping the help icon indicated by (?) lets you access the Help Center.',
+    ),
+  ];
 
   List<MedicineRecord> _medicines = <MedicineRecord>[];
   Set<String> _takenReminderKeys = <String>{};
@@ -79,16 +100,54 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _loadMedicines();
     _loadStocks();
     _loadReminderCompletionState();
-    startDashboardTutorialIfNeeded(
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+
+      _showFirstLoginSectionsPopupThenTutorial();
+    });
+  }
+
+  Future<void> _startDashboardTutorialIfNeeded() async {
+    await startDashboardTutorialIfNeeded(
       context: context,
       isMounted: () => mounted,
       steps: buildDashboardTutorialSteps(
         titleShowcaseKey: _titleShowcaseKey,
+        scheduleButtonShowcaseKey: _scheduleButtonShowcaseKey,
         dateSelectorShowcaseKey: _dateSelectorShowcaseKey,
-        addReminderShowcaseKey: _addReminderShowcaseKey,
-        stockShowcaseKey: _stockShowcaseKey,
+        stockTabShowcaseKey: _stockTabShowcaseKey,
       ),
     );
+  }
+
+  Future<void> _showFirstLoginSectionsPopupThenTutorial() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final bool hasSeenSectionsIntro =
+      prefs.getBool(TutorialPreferences.firstLoginSectionsSeenKey) ?? false;
+
+    if (!mounted) {
+      return;
+    }
+
+    if (!hasSeenSectionsIntro) {
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return IntroPopupDialog(pages: _firstLoginSectionsPages);
+        },
+      );
+
+      await prefs.setBool(TutorialPreferences.firstLoginSectionsSeenKey, true);
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    await _startDashboardTutorialIfNeeded();
   }
 
   Future<void> _openHelpSectionsPopup() async {
@@ -107,9 +166,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
             isMounted: () => mounted,
             steps: buildDashboardTutorialSteps(
               titleShowcaseKey: _titleShowcaseKey,
+              scheduleButtonShowcaseKey: _scheduleButtonShowcaseKey,
               dateSelectorShowcaseKey: _dateSelectorShowcaseKey,
-              addReminderShowcaseKey: _addReminderShowcaseKey,
-              stockShowcaseKey: _stockShowcaseKey,
+              stockTabShowcaseKey: _stockTabShowcaseKey,
             ),
           );
           break;
@@ -127,81 +186,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           break;
       }
     }
-  }
-
-  Future<void> _openSettingsMenu() async {
-    final bool? resetTutorials = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext context) {
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Settings',
-                  style: TextStyle(
-                    color: textDark,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 18,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.restart_alt, color: textLight),
-                  title: Text(
-                    'Reset Tutorials',
-                    style: TextStyle(
-                      color: textDark,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  subtitle: Text(
-                    'Show all first-time tutorials again. Requires app restart.',
-                    style: TextStyle(color: textFaint),
-                  ),
-                  onTap: () {
-                    Navigator.of(context).pop(true);
-                  },
-                ),
-                const SizedBox(height: 4),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: () {
-                      Navigator.of(context).pop(false);
-                    },
-                    child: const Text('Close'),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-
-    if (resetTutorials != true || !mounted) {
-      return;
-    }
-
-    await TutorialPreferences.resetAllSeen();
-
-    if (!mounted) {
-      return;
-    }
-
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        const SnackBar(content: Text('Tutorials have been reset.')),
-      );
   }
 
   Future<void> _loadMedicines() async {
@@ -420,37 +404,66 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ),
                           ],
                         ),
-                        Container(
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            color: cardColor,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.03),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
+                        Row(
+                          children: [
+                            Container(
+                              width: 48,
+                              height: 48,
+                              decoration: BoxDecoration(
+                                color: cardColor,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.03),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
-                          child: IconButton(
-                            icon: Icon(
-                              Icons.settings_outlined,
-                              color: textLight,
-                              size: 24,
+                              child: IconButton(
+                                tooltip: 'Help Center',
+                                icon: Icon(
+                                  Icons.help_outline,
+                                  color: textLight,
+                                  size: 24,
+                                ),
+                                onPressed: _openHelpSectionsPopup,
+                              ),
                             ),
-                            onPressed: () {
-                              showModalBottomSheet(
-                                context: context,
-                                isScrollControlled: true,
-                                useSafeArea: true,
-                                backgroundColor: Colors.transparent,
-                                builder: (BuildContext context) =>
-                                    const SettingsModal(),
-                              );
-                            },
-                          ),
+                            const SizedBox(width: 10),
+                            Container(
+                              width: 48,
+                              height: 48,
+                              decoration: BoxDecoration(
+                                color: cardColor,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.03),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: IconButton(
+                                icon: Icon(
+                                  Icons.settings_outlined,
+                                  color: textLight,
+                                  size: 24,
+                                ),
+                                onPressed: () {
+                                  showModalBottomSheet(
+                                    context: context,
+                                    isScrollControlled: true,
+                                    useSafeArea: true,
+                                    backgroundColor: Colors.transparent,
+                                    builder: (BuildContext context) =>
+                                        const SettingsModal(),
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -460,37 +473,49 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         Expanded(
-                          child: Text(
-                            'Reminders',
-                            style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w600,
-                              color: textDark,
-                              letterSpacing: -0.5,
+                          child: Showcase(
+                            key: _titleShowcaseKey,
+                            title: 'Reminders dashboard overview',
+                            description:
+                                'This is the reminders dashboard where you can review today\'s medication list.',
+                            child: Text(
+                              'Reminders',
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w600,
+                                color: textDark,
+                                letterSpacing: -0.5,
+                              ),
                             ),
                           ),
                         ),
-                        ElevatedButton.icon(
-                          onPressed: _openMedicineModal,
-                          icon: const Icon(Icons.add, color: Colors.white),
-                          label: const Text(
-                            'Schedule Medication',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.1,
+                        Showcase(
+                          key: _scheduleButtonShowcaseKey,
+                          title: 'Schedule medication',
+                          description:
+                              'Use this button to add a new medication reminder.',
+                          child: ElevatedButton.icon(
+                            onPressed: _openMedicineModal,
+                            icon: const Icon(Icons.add, color: Colors.white),
+                            label: const Text(
+                              'Schedule Medication',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0.1,
+                              ),
                             ),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: textDark,
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            padding: const EdgeInsets.symmetric(
-                              vertical: 14,
-                              horizontal: 18,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(18),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: textDark,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 14,
+                                horizontal: 18,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(18),
+                              ),
                             ),
                           ),
                         ),
@@ -498,7 +523,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                     const SizedBox(height: 12),
                     // Date selector row
-                    _buildDateSelector(),
+                    Showcase(
+                      key: _dateSelectorShowcaseKey,
+                      title: 'Pick a day',
+                      description:
+                          'Switch between dates to review reminders for any day of the week.',
+                      child: _buildDateSelector(),
+                    ),
                     const SizedBox(height: 14),
                     Row(
                       children: [
@@ -533,24 +564,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
               )
             : const StockScreen(),
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedTabIndex,
-        onTap: (int index) {
-          setState(() {
-            _selectedTabIndex = index;
-            if (index == 1) _loadStocks();
-          });
-        },
-        backgroundColor: cardColor,
-        selectedItemColor: textDark,
-        unselectedItemColor: textFaint,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.alarm), label: 'Reminders'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.inventory_2_outlined),
-            label: 'Stocks',
-          ),
-        ],
+      bottomNavigationBar: Showcase(
+        key: _stockTabShowcaseKey,
+        title: 'Open stocks',
+        description:
+            'Tap here to manage inventory and move to the stock screen.',
+        child: BottomNavigationBar(
+          currentIndex: _selectedTabIndex,
+          onTap: (int index) {
+            setState(() {
+              _selectedTabIndex = index;
+              if (index == 1) _loadStocks();
+            });
+          },
+          backgroundColor: cardColor,
+          selectedItemColor: textDark,
+          unselectedItemColor: textFaint,
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.alarm),
+              label: 'Reminders',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.inventory_2_outlined),
+              label: 'Stocks',
+            ),
+          ],
+        ),
       ),
     );
   }

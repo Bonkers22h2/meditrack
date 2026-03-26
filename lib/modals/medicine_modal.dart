@@ -26,6 +26,13 @@ class _MedicineModalState extends State<MedicineModal>
   int _currentTabIndex = 0;
   late final TabController _tabController;
 
+  final GlobalKey _scheduleDetailsShowcaseKey = GlobalKey();
+  final GlobalKey _scheduleIconShowcaseKey = GlobalKey();
+  final GlobalKey _scheduleDoseShowcaseKey = GlobalKey();
+  final GlobalKey _scheduleFrequencyShowcaseKey = GlobalKey();
+  final GlobalKey _scheduleRangeShowcaseKey = GlobalKey();
+  final GlobalKey _scheduleSaveShowcaseKey = GlobalKey();
+
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _doseAmountController = TextEditingController();
   final TextEditingController _frequencyController = TextEditingController();
@@ -63,6 +70,16 @@ class _MedicineModalState extends State<MedicineModal>
     _populateInitialValues();
     _loadMedicineNamesFromStocks();
     // _refreshNotificationStatus() removed; notification logic is now in settings modal
+
+    if (widget.startScheduleTutorial) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+
+        _startScheduleTutorial();
+      });
+    }
   }
 
   @override
@@ -109,26 +126,26 @@ class _MedicineModalState extends State<MedicineModal>
                     padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
                     child: Row(
                       children: [
-                        Showcase(
-                          key: _medicineIconShowcaseKey,
-                          title: 'Customize icon',
-                          description:
-                              'Tap here to choose a unique icon for this medicine. It helps you quickly identify your medications.',
-                          child: GestureDetector(
-                            onTap: _showIconPicker,
-                            child: Container(
-                              width: 60,
-                              height: 60,
-                              decoration: const BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle,
+                          Showcase(
+                            key: _scheduleIconShowcaseKey,
+                            title: 'Set an icon',
+                            description:
+                                'You can choose an icon to make this schedule easier to recognize later.',
+                            child: GestureDetector(
+                              onTap: _showIconPicker,
+                              child: Container(
+                                width: 60,
+                                height: 60,
+                                decoration: const BoxDecoration(
+                                  color: Colors.white,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  MedicineIcons.resolve(_selectedIconKey),
+                                  color: sectionHeaderColor,
+                                  size: 32,
+                                ),
                               ),
-                              child: Icon(
-                                MedicineIcons.resolve(_selectedIconKey),
-                                color: sectionHeaderColor,
-                                size: 32,
-                              ),
-                            ),
                           ),
                         ),
                         const SizedBox(width: 16),
@@ -311,7 +328,15 @@ class _MedicineModalState extends State<MedicineModal>
           padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: [_buildMedicationDropdownGroup()],
+            children: [
+              Showcase(
+                key: _scheduleDetailsShowcaseKey,
+                title: 'Choose medication type',
+                description:
+                    'This is where you pick which medicine you want to schedule before setting the dosage.',
+                child: _buildMedicationDropdownGroup(),
+              ),
+            ],
           ),
         );
       case 1:
@@ -320,17 +345,35 @@ class _MedicineModalState extends State<MedicineModal>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildInputGroup(
-                label: 'Dose Amount',
-                hint: '1 pill..',
-                controller: _doseAmountController,
+              Showcase(
+                key: _scheduleDoseShowcaseKey,
+                title: 'Dose amount',
+                description:
+                    'Enter how much of the medicine the user should take each time.',
+                child: _buildInputGroup(
+                  label: 'Dose Amount',
+                  hint: '1 pill..',
+                  controller: _doseAmountController,
+                ),
               ),
-              _buildInputGroup(
-                label: 'Frequency',
-                hint: 'Daily..',
-                controller: _frequencyController,
+              Showcase(
+                key: _scheduleFrequencyShowcaseKey,
+                title: 'Frequency',
+                description:
+                    'Set how often this medicine should be taken, like daily or every 6 hours.',
+                child: _buildInputGroup(
+                  label: 'Frequency',
+                  hint: 'Daily..',
+                  controller: _frequencyController,
+                ),
               ),
-              _buildReminderRangeGroup(),
+              Showcase(
+                key: _scheduleRangeShowcaseKey,
+                title: 'Schedule dates and time',
+                description:
+                    'Choose the date range and reminder time for this medication schedule.',
+                child: _buildReminderRangeGroup(),
+              ),
               // Notification enable and test UI moved to settings modal
             ],
           ),
@@ -810,8 +853,11 @@ class _MedicineModalState extends State<MedicineModal>
       isMounted: () => mounted,
       currentTabIndex: _currentTabIndex,
       goToTab: _goToTab,
-      steps: buildScheduleTutorialSteps(
-        medicineIconShowcaseKey: _medicineIconShowcaseKey,
+      introSteps: buildScheduleTutorialIntroSteps(
+        scheduleDetailsShowcaseKey: _scheduleDetailsShowcaseKey,
+      ),
+      dosageSteps: buildScheduleTutorialSteps(
+        scheduleIconShowcaseKey: _scheduleIconShowcaseKey,
         scheduleDoseShowcaseKey: _scheduleDoseShowcaseKey,
         scheduleFrequencyShowcaseKey: _scheduleFrequencyShowcaseKey,
         scheduleRangeShowcaseKey: _scheduleRangeShowcaseKey,

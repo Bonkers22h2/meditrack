@@ -5,12 +5,15 @@ class TutorialPreferences {
 
   static const String dashboardTutorialSeenKey = 'dashboard_tutorial_seen_v1';
   static const String loginIntroSeenKey = 'login_intro_popup_seen_v1';
+  static const String firstLoginSectionsSeenKey =
+      'first_login_sections_popup_seen_v1';
   static const String scheduleTutorialSeenKey = 'schedule_tutorial_seen_v1';
   static const String stockTutorialSeenKey = 'stock_tutorial_seen_v1';
 
   static const List<String> allTutorialSeenKeys = <String>[
     dashboardTutorialSeenKey,
     loginIntroSeenKey,
+    firstLoginSectionsSeenKey,
     scheduleTutorialSeenKey,
     stockTutorialSeenKey,
   ];
