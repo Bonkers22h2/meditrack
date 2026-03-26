@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:meditrack/modals/medicine_details_modal.dart';
 import 'package:meditrack/modals/medicine_modal.dart';
 import 'package:meditrack/pages/stocks.dart';
@@ -154,6 +155,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _takenReminderKeys.add(storageKey);
     });
 
+    await _persistReminderCompletionState();
+
     final DateTime scheduledAt = DateTime(
       _selectedDate.year,
       _selectedDate.month,
@@ -161,15 +164,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
       reminder.time.hour,
       reminder.time.minute,
     );
-    try {
-      await NotificationService.cancelEscalatingReminderAttempts(
-        medicineCreatedAtMillis:
-            reminder.medicine.createdAt.millisecondsSinceEpoch,
-        scheduledAt: scheduledAt,
-      );
-    } catch (_) {
+    NotificationService.cancelEscalatingReminderAttempts(
+      medicineCreatedAtMillis:
+          reminder.medicine.createdAt.millisecondsSinceEpoch,
+      scheduledAt: scheduledAt,
+    ).catchError((_) {
       // Continue local completion flow even if notification cancellation fails.
-    }
+    });
 
     final int doseCount = _extractDoseCount(reminder.medicine.doseAmount);
     bool deducted = false;
@@ -179,8 +180,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
         amount: doseCount,
       );
       if (deducted) {
-        _deductedReminderKeys.add(storageKey);
-        await _loadStocks();
+        if (mounted) {
+          setState(() {
+            _deductedReminderKeys.add(storageKey);
+          });
+        } else {
+          _deductedReminderKeys.add(storageKey);
+        }
+        unawaited(_loadStocks());
       }
     }
 

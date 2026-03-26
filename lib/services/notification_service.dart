@@ -13,7 +13,7 @@ class NotificationService {
 
   static bool _initialized = false;
   static const int _escalationAttempts = 3;
-  static const int _continuousLevel3Retries = 180;
+  static const int _continuousLevel3Retries = 12;
   static const int _totalReminderAttempts =
       _escalationAttempts + _continuousLevel3Retries;
   static const Duration _escalationInterval = Duration(minutes: 2);
@@ -242,14 +242,18 @@ class NotificationService {
       scheduledAt: scheduledAt,
     );
 
+    final List<Future<void>> cancelOperations = <Future<void>>[];
     for (int attempt = 0; attempt < _totalReminderAttempts; attempt += 1) {
-      await _plugin.cancel(
-        _notificationIdForAttempt(
-          reminderIdentity: reminderIdentity,
-          attempt: attempt,
+      cancelOperations.add(
+        _plugin.cancel(
+          _notificationIdForAttempt(
+            reminderIdentity: reminderIdentity,
+            attempt: attempt,
+          ),
         ),
       );
     }
+    await Future.wait(cancelOperations);
   }
 
   static Future<void> _scheduleEscalatingReminder({
@@ -263,20 +267,24 @@ class NotificationService {
       scheduledAt: scheduledDate,
     );
 
+    final List<Future<void>> scheduleOperations = <Future<void>>[];
     for (int attempt = 0; attempt < _totalReminderAttempts; attempt += 1) {
-      await _zonedScheduleWithFallback(
-        notificationId: _notificationIdForAttempt(
-          reminderIdentity: reminderIdentity,
-          attempt: attempt,
+      scheduleOperations.add(
+        _zonedScheduleWithFallback(
+          notificationId: _notificationIdForAttempt(
+            reminderIdentity: reminderIdentity,
+            attempt: attempt,
+          ),
+          title: title,
+          body: body,
+          scheduledDate: scheduledDate.add(
+            Duration(minutes: _escalationInterval.inMinutes * attempt),
+          ),
+          notificationDetails: _notificationDetailsForAttempt(attempt),
         ),
-        title: title,
-        body: body,
-        scheduledDate: scheduledDate.add(
-          Duration(minutes: _escalationInterval.inMinutes * attempt),
-        ),
-        notificationDetails: _notificationDetailsForAttempt(attempt),
       );
     }
+    await Future.wait(scheduleOperations);
   }
 
   static Future<void> _zonedScheduleWithFallback({
