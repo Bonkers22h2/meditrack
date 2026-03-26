@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:meditrack/modals/stock_modal.dart';
 import 'package:meditrack/services/stock_storage.dart';
+import 'package:meditrack/tutorials/stock_tutorial.dart';
+import 'package:showcaseview/showcaseview.dart';
 
 class StockScreen extends StatefulWidget {
-  const StockScreen({super.key});
+  const StockScreen({super.key, this.startTutorial = false});
+
+  final bool startTutorial;
 
   @override
   State<StockScreen> createState() => _StockScreenState();
@@ -12,6 +16,11 @@ class StockScreen extends StatefulWidget {
 class _StockScreenState extends State<StockScreen> {
   List<StockRecord> _stocks = <StockRecord>[];
   bool _isLoading = true;
+
+  final GlobalKey _titleShowcaseKey = GlobalKey();
+  final GlobalKey _addMedicationShowcaseKey = GlobalKey();
+  final GlobalKey _stockListShowcaseKey = GlobalKey();
+  final GlobalKey _reportShowcaseKey = GlobalKey();
 
   // Reusing the core colors
   final Color backgroundColor = const Color(0xFFF4F5F0);
@@ -32,6 +41,20 @@ class _StockScreenState extends State<StockScreen> {
   void initState() {
     super.initState();
     _loadStocks();
+    if (widget.startTutorial) {
+      _startStockTutorial();
+    } else {
+      startStockTutorialIfNeeded(
+        context: context,
+        isMounted: () => mounted,
+        steps: buildStockTutorialSteps(
+          titleShowcaseKey: _titleShowcaseKey,
+          addMedicationShowcaseKey: _addMedicationShowcaseKey,
+          stockListShowcaseKey: _stockListShowcaseKey,
+          reportShowcaseKey: _reportShowcaseKey,
+        ),
+      );
+    }
   }
 
   Future<void> _loadStocks() async {
@@ -72,6 +95,19 @@ class _StockScreenState extends State<StockScreen> {
 
     await StockStorage.upsertStock(updatedStock);
     await _loadStocks();
+  }
+
+  Future<void> _startStockTutorial() async {
+    await startStockTutorial(
+      context: context,
+      isMounted: () => mounted,
+      steps: buildStockTutorialSteps(
+        titleShowcaseKey: _titleShowcaseKey,
+        addMedicationShowcaseKey: _addMedicationShowcaseKey,
+        stockListShowcaseKey: _stockListShowcaseKey,
+        reportShowcaseKey: _reportShowcaseKey,
+      ),
+    );
   }
 
   String _dosesText(int count) {
@@ -183,28 +219,57 @@ class _StockScreenState extends State<StockScreen> {
                       ),
                     ],
                   ),
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: cardColor,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.03),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
+                  Row(
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: cardColor,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.03),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                    child: IconButton(
-                      icon: Icon(
-                        Icons.settings_outlined,
-                        color: textLight,
-                        size: 24,
+                        child: IconButton(
+                          tooltip: 'Stock tutorial',
+                          icon: Icon(
+                            Icons.help_outline,
+                            color: textLight,
+                            size: 24,
+                          ),
+                          onPressed: _startStockTutorial,
+                        ),
                       ),
-                      onPressed: () {},
-                    ),
+                      const SizedBox(width: 10),
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: cardColor,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.03),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: IconButton(
+                          icon: Icon(
+                            Icons.settings_outlined,
+                            color: textLight,
+                            size: 24,
+                          ),
+                          onPressed: () {},
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -212,35 +277,47 @@ class _StockScreenState extends State<StockScreen> {
               const SizedBox(height: 32),
 
               // 2. Title
-              Text(
-                'Stock',
-                style: TextStyle(
-                  fontSize: 38,
-                  fontWeight: FontWeight.w400,
-                  color: textDark,
-                  letterSpacing: -0.5,
+              Showcase(
+                key: _titleShowcaseKey,
+                title: 'Stock management',
+                description:
+                    'This page helps you keep track of medication inventory, refill timing, and expiring items.',
+                child: Text(
+                  'Stock',
+                  style: TextStyle(
+                    fontSize: 38,
+                    fontWeight: FontWeight.w400,
+                    color: textDark,
+                    letterSpacing: -0.5,
+                  ),
                 ),
               ),
 
               const SizedBox(height: 16),
 
-              Align(
-                alignment: Alignment.centerLeft,
-                child: ElevatedButton.icon(
-                  onPressed: _openAddStockModal,
-                  icon: const Icon(Icons.add),
-                  label: const Text('Add Medication'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: cardColor,
-                    foregroundColor: textDark,
-                    elevation: 0,
-                    side: BorderSide(color: textFaint.withOpacity(0.35)),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 10,
+              Showcase(
+                key: _addMedicationShowcaseKey,
+                title: 'Add medication stock',
+                description:
+                    'Create a stock entry for a medicine so the app can track how many doses are left.',
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: ElevatedButton.icon(
+                    onPressed: _openAddStockModal,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Add Medication'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: cardColor,
+                      foregroundColor: textDark,
+                      elevation: 0,
+                      side: BorderSide(color: textFaint.withOpacity(0.35)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
                     ),
                   ),
                 ),
@@ -248,44 +325,56 @@ class _StockScreenState extends State<StockScreen> {
 
               const SizedBox(height: 8),
 
-              _buildStockListBySection(),
+              Showcase(
+                key: _stockListShowcaseKey,
+                title: 'Track inventory',
+                description:
+                    'Low stock, refill soon, and in-stock items are grouped so you can prioritize what needs attention.',
+                child: _buildStockListBySection(),
+              ),
 
               const SizedBox(height: 24),
 
               // 6. View Report Button
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFFDCDCDC)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.02),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
+              Showcase(
+                key: _reportShowcaseKey,
+                title: 'View reports',
+                description:
+                    'Use reports to review your stock history and spot items that need attention.',
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(8),
-                      onTap: () {
-                        // View report logic
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16.0,
-                          vertical: 10.0,
+                      border: Border.all(color: const Color(0xFFDCDCDC)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.02),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
                         ),
-                        child: Text(
-                          'View Report',
-                          style: TextStyle(
-                            color: textDark,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
+                      ],
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(8),
+                        onTap: () {
+                          // View report logic
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16.0,
+                            vertical: 10.0,
+                          ),
+                          child: Text(
+                            'View Report',
+                            style: TextStyle(
+                              color: textDark,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ),
                       ),

@@ -4,11 +4,18 @@ import 'package:meditrack/services/medicine_icons.dart';
 import 'package:meditrack/services/notification_service.dart';
 import 'package:meditrack/services/medicine_storage.dart';
 import 'package:meditrack/services/stock_storage.dart';
+import 'package:meditrack/tutorials/schedule_tutorial.dart';
+import 'package:showcaseview/showcaseview.dart';
 
 class MedicineModal extends StatefulWidget {
-  const MedicineModal({super.key, this.initialMedicine});
+  const MedicineModal({
+    super.key,
+    this.initialMedicine,
+    this.startScheduleTutorial = false,
+  });
 
   final MedicineRecord? initialMedicine;
+  final bool startScheduleTutorial;
 
   @override
   State<MedicineModal> createState() => _MedicineModalState();
@@ -35,6 +42,12 @@ class _MedicineModalState extends State<MedicineModal>
   bool _isCheckingNotificationStatus = true;
   bool _isSendingTestNotification = false;
 
+  final GlobalKey _medicineIconShowcaseKey = GlobalKey();
+  final GlobalKey _scheduleDoseShowcaseKey = GlobalKey();
+  final GlobalKey _scheduleFrequencyShowcaseKey = GlobalKey();
+  final GlobalKey _scheduleRangeShowcaseKey = GlobalKey();
+  final GlobalKey _scheduleSaveShowcaseKey = GlobalKey();
+
   // Custom colors matching your new design
   final Color modalBgColor = const Color(0xFFC0D1BD);
   final Color sectionHeaderColor = const Color(0xFF8BBA91);
@@ -58,6 +71,36 @@ class _MedicineModalState extends State<MedicineModal>
     _populateInitialValues();
     _loadMedicineNamesFromStocks();
     _refreshNotificationStatus();
+
+    if (widget.startScheduleTutorial) {
+      startScheduleTutorial(
+        context: context,
+        isMounted: () => mounted,
+        currentTabIndex: _currentTabIndex,
+        goToTab: _goToTab,
+        steps: buildScheduleTutorialSteps(
+          medicineIconShowcaseKey: _medicineIconShowcaseKey,
+          scheduleDoseShowcaseKey: _scheduleDoseShowcaseKey,
+          scheduleFrequencyShowcaseKey: _scheduleFrequencyShowcaseKey,
+          scheduleRangeShowcaseKey: _scheduleRangeShowcaseKey,
+          scheduleSaveShowcaseKey: _scheduleSaveShowcaseKey,
+        ),
+      );
+    } else {
+      startScheduleTutorialIfNeeded(
+        context: context,
+        isMounted: () => mounted,
+        currentTabIndex: _currentTabIndex,
+        goToTab: _goToTab,
+        steps: buildScheduleTutorialSteps(
+          medicineIconShowcaseKey: _medicineIconShowcaseKey,
+          scheduleDoseShowcaseKey: _scheduleDoseShowcaseKey,
+          scheduleFrequencyShowcaseKey: _scheduleFrequencyShowcaseKey,
+          scheduleRangeShowcaseKey: _scheduleRangeShowcaseKey,
+          scheduleSaveShowcaseKey: _scheduleSaveShowcaseKey,
+        ),
+      );
+    }
   }
 
   @override
@@ -104,19 +147,25 @@ class _MedicineModalState extends State<MedicineModal>
                     padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
                     child: Row(
                       children: [
-                        GestureDetector(
-                          onTap: _showIconPicker,
-                          child: Container(
-                            width: 60,
-                            height: 60,
-                            decoration: const BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              MedicineIcons.resolve(_selectedIconKey),
-                              color: sectionHeaderColor,
-                              size: 32,
+                        Showcase(
+                          key: _medicineIconShowcaseKey,
+                          title: 'Customize icon',
+                          description:
+                              'Tap here to choose a unique icon for this medicine. It helps you quickly identify your medications.',
+                          child: GestureDetector(
+                            onTap: _showIconPicker,
+                            child: Container(
+                              width: 60,
+                              height: 60,
+                              decoration: const BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                MedicineIcons.resolve(_selectedIconKey),
+                                color: sectionHeaderColor,
+                                size: 32,
+                              ),
                             ),
                           ),
                         ),
@@ -148,6 +197,11 @@ class _MedicineModalState extends State<MedicineModal>
                         TextButton(
                           onPressed: _showIconPicker,
                           child: const Text('Edit'),
+                        ),
+                        IconButton(
+                          tooltip: 'Schedule tutorial',
+                          icon: const Icon(Icons.help_outline),
+                          onPressed: _startScheduleTutorial,
                         ),
                       ],
                     ),
@@ -238,34 +292,40 @@ class _MedicineModalState extends State<MedicineModal>
                         // Save Button
                         Expanded(
                           flex: 3,
-                          child: ElevatedButton(
-                            onPressed: _isSaving
-                                ? null
-                                : () {
-                                    if (_currentTabIndex < 1) {
-                                      _goToTab(_currentTabIndex + 1);
-                                      return;
-                                    }
-                                    _saveMedicine();
-                                  },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: saveBtnColor,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(20),
+                          child: Showcase(
+                            key: _scheduleSaveShowcaseKey,
+                            title: 'Save schedule',
+                            description:
+                                'When you are done, tap here to save medication details and schedule reminders.',
+                            child: ElevatedButton(
+                              onPressed: _isSaving
+                                  ? null
+                                  : () {
+                                      if (_currentTabIndex < 1) {
+                                        _goToTab(_currentTabIndex + 1);
+                                        return;
+                                      }
+                                      _saveMedicine();
+                                    },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: saveBtnColor,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                elevation: 0,
                               ),
-                              elevation: 0,
-                            ),
-                            child: Text(
-                              _currentTabIndex < 1
-                                  ? 'Next'
-                                  : _isSaving
-                                  ? (isEditMode ? 'Updating...' : 'Saving...')
-                                  : (isEditMode ? 'Update' : 'Save'),
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w400,
+                              child: Text(
+                                _currentTabIndex < 1
+                                    ? 'Next'
+                                    : _isSaving
+                                    ? (isEditMode ? 'Updating...' : 'Saving...')
+                                    : (isEditMode ? 'Update' : 'Save'),
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w400,
+                                ),
                               ),
                             ),
                           ),
@@ -298,17 +358,35 @@ class _MedicineModalState extends State<MedicineModal>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildInputGroup(
-                label: 'Dose Amount',
-                hint: '1 pill..',
-                controller: _doseAmountController,
+              Showcase(
+                key: _scheduleDoseShowcaseKey,
+                title: 'Dose amount',
+                description:
+                    'Enter how much medicine to take for each reminder, like 1 pill.',
+                child: _buildInputGroup(
+                  label: 'Dose Amount',
+                  hint: '1 pill..',
+                  controller: _doseAmountController,
+                ),
               ),
-              _buildInputGroup(
-                label: 'Frequency',
-                hint: 'Daily..',
-                controller: _frequencyController,
+              Showcase(
+                key: _scheduleFrequencyShowcaseKey,
+                title: 'Frequency',
+                description:
+                    'Set how often this medicine is taken, for example Daily.',
+                child: _buildInputGroup(
+                  label: 'Frequency',
+                  hint: 'Daily..',
+                  controller: _frequencyController,
+                ),
               ),
-              _buildReminderRangeGroup(),
+              Showcase(
+                key: _scheduleRangeShowcaseKey,
+                title: 'Schedule range',
+                description:
+                    'Pick a start date, end date, and time to create reminders for your medication schedule.',
+                child: _buildReminderRangeGroup(),
+              ),
               _buildNotificationTestCard(),
             ],
           ),
@@ -924,6 +1002,22 @@ class _MedicineModalState extends State<MedicineModal>
     setState(() {
       _currentTabIndex = index;
     });
+  }
+
+  Future<void> _startScheduleTutorial() async {
+    await startScheduleTutorial(
+      context: context,
+      isMounted: () => mounted,
+      currentTabIndex: _currentTabIndex,
+      goToTab: _goToTab,
+      steps: buildScheduleTutorialSteps(
+        medicineIconShowcaseKey: _medicineIconShowcaseKey,
+        scheduleDoseShowcaseKey: _scheduleDoseShowcaseKey,
+        scheduleFrequencyShowcaseKey: _scheduleFrequencyShowcaseKey,
+        scheduleRangeShowcaseKey: _scheduleRangeShowcaseKey,
+        scheduleSaveShowcaseKey: _scheduleSaveShowcaseKey,
+      ),
+    );
   }
 
   Future<void> _loadMedicineNamesFromStocks() async {
