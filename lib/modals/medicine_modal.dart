@@ -38,15 +38,7 @@ class _MedicineModalState extends State<MedicineModal>
   List<String> _stockMedicineNames = <String>[];
   Map<String, int> _stockCountByMedicine = <String, int>{};
   bool _isLoadingStockNames = true;
-  bool? _notificationsEnabled;
-  bool _isCheckingNotificationStatus = true;
-  bool _isSendingTestNotification = false;
-
-  final GlobalKey _medicineIconShowcaseKey = GlobalKey();
-  final GlobalKey _scheduleDoseShowcaseKey = GlobalKey();
-  final GlobalKey _scheduleFrequencyShowcaseKey = GlobalKey();
-  final GlobalKey _scheduleRangeShowcaseKey = GlobalKey();
-  final GlobalKey _scheduleSaveShowcaseKey = GlobalKey();
+  // Notification test logic moved to settings modal
 
   // Custom colors matching your new design
   final Color modalBgColor = const Color(0xFFC0D1BD);
@@ -70,37 +62,7 @@ class _MedicineModalState extends State<MedicineModal>
       });
     _populateInitialValues();
     _loadMedicineNamesFromStocks();
-    _refreshNotificationStatus();
-
-    if (widget.startScheduleTutorial) {
-      startScheduleTutorial(
-        context: context,
-        isMounted: () => mounted,
-        currentTabIndex: _currentTabIndex,
-        goToTab: _goToTab,
-        steps: buildScheduleTutorialSteps(
-          medicineIconShowcaseKey: _medicineIconShowcaseKey,
-          scheduleDoseShowcaseKey: _scheduleDoseShowcaseKey,
-          scheduleFrequencyShowcaseKey: _scheduleFrequencyShowcaseKey,
-          scheduleRangeShowcaseKey: _scheduleRangeShowcaseKey,
-          scheduleSaveShowcaseKey: _scheduleSaveShowcaseKey,
-        ),
-      );
-    } else {
-      startScheduleTutorialIfNeeded(
-        context: context,
-        isMounted: () => mounted,
-        currentTabIndex: _currentTabIndex,
-        goToTab: _goToTab,
-        steps: buildScheduleTutorialSteps(
-          medicineIconShowcaseKey: _medicineIconShowcaseKey,
-          scheduleDoseShowcaseKey: _scheduleDoseShowcaseKey,
-          scheduleFrequencyShowcaseKey: _scheduleFrequencyShowcaseKey,
-          scheduleRangeShowcaseKey: _scheduleRangeShowcaseKey,
-          scheduleSaveShowcaseKey: _scheduleSaveShowcaseKey,
-        ),
-      );
-    }
+    // _refreshNotificationStatus() removed; notification logic is now in settings modal
   }
 
   @override
@@ -358,36 +320,18 @@ class _MedicineModalState extends State<MedicineModal>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Showcase(
-                key: _scheduleDoseShowcaseKey,
-                title: 'Dose amount',
-                description:
-                    'Enter how much medicine to take for each reminder, like 1 pill.',
-                child: _buildInputGroup(
-                  label: 'Dose Amount',
-                  hint: '1 pill..',
-                  controller: _doseAmountController,
-                ),
+              _buildInputGroup(
+                label: 'Dose Amount',
+                hint: '1 pill..',
+                controller: _doseAmountController,
               ),
-              Showcase(
-                key: _scheduleFrequencyShowcaseKey,
-                title: 'Frequency',
-                description:
-                    'Set how often this medicine is taken, for example Daily.',
-                child: _buildInputGroup(
-                  label: 'Frequency',
-                  hint: 'Daily..',
-                  controller: _frequencyController,
-                ),
+              _buildInputGroup(
+                label: 'Frequency',
+                hint: 'Daily..',
+                controller: _frequencyController,
               ),
-              Showcase(
-                key: _scheduleRangeShowcaseKey,
-                title: 'Schedule range',
-                description:
-                    'Pick a start date, end date, and time to create reminders for your medication schedule.',
-                child: _buildReminderRangeGroup(),
-              ),
-              _buildNotificationTestCard(),
+              _buildReminderRangeGroup(),
+              // Notification enable and test UI moved to settings modal
             ],
           ),
         );
@@ -396,153 +340,9 @@ class _MedicineModalState extends State<MedicineModal>
     }
   }
 
-  Widget _buildNotificationTestCard() {
-    final String statusText;
-    if (_isCheckingNotificationStatus) {
-      statusText = 'Checking notification permission...';
-    } else if (_notificationsEnabled == true) {
-      statusText = 'Notifications: Enabled';
-    } else {
-      statusText = 'Notifications: Disabled';
-    }
+  // Notification test card widget removed
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16.0),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: inputBgColor,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    statusText,
-                    style: TextStyle(fontSize: 13, color: textDark),
-                  ),
-                ),
-                TextButton(
-                  onPressed: _isCheckingNotificationStatus
-                      ? null
-                      : _refreshNotificationStatus,
-                  child: const Text('Refresh'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: _isSendingTestNotification
-                        ? null
-                        : _sendInstantTestNotification,
-                    child: const Text('Test now'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: _isSendingTestNotification
-                        ? null
-                        : _sendDelayedTestNotification,
-                    child: const Text('Test in 10s'),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _refreshNotificationStatus() async {
-    setState(() {
-      _isCheckingNotificationStatus = true;
-    });
-
-    bool enabled = true;
-    try {
-      enabled = await NotificationService.areNotificationsEnabled();
-    } catch (_) {
-      enabled = false;
-    }
-
-    if (!mounted) {
-      return;
-    }
-
-    setState(() {
-      _notificationsEnabled = enabled;
-      _isCheckingNotificationStatus = false;
-    });
-  }
-
-  Future<void> _sendInstantTestNotification() async {
-    await _sendTestNotification(delayedSeconds: 0);
-  }
-
-  Future<void> _sendDelayedTestNotification() async {
-    await _sendTestNotification(delayedSeconds: 10);
-  }
-
-  Future<void> _sendTestNotification({required int delayedSeconds}) async {
-    setState(() {
-      _isSendingTestNotification = true;
-    });
-
-    final bool hasAccess = await NotificationService.ensureNotificationAccess();
-    if (!hasAccess) {
-      if (mounted) {
-        setState(() {
-          _isSendingTestNotification = false;
-        });
-        _showSnackBar(
-          'Notifications are disabled. Enable app notifications in system settings.',
-        );
-        await _refreshNotificationStatus();
-      }
-      return;
-    }
-
-    final int notificationId = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-    final String medicineName = _nameController.text.trim().isEmpty
-        ? 'your medicine'
-        : _nameController.text.trim();
-
-    try {
-      if (delayedSeconds == 0) {
-        await NotificationService.showInstantTestNotification(
-          notificationId: notificationId,
-          title: 'Test Reminder',
-          body: 'This is an instant reminder for $medicineName.',
-        );
-        _showSnackBar('Instant test notification sent.');
-      } else {
-        await NotificationService.scheduleTestNotificationInSeconds(
-          notificationId: notificationId,
-          seconds: delayedSeconds,
-          title: 'Test Reminder',
-          body: 'Time to take $medicineName.',
-        );
-        _showSnackBar('Test notification scheduled in 10 seconds.');
-      }
-    } catch (_) {
-      _showSnackBar('Unable to send test notification. Check permission.');
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isSendingTestNotification = false;
-        });
-        await _refreshNotificationStatus();
-      }
-    }
-  }
+  // Notification test logic removed
 
   // Widget builder for the standard Input fields (Label + TextField)
   Widget _buildInputGroup({

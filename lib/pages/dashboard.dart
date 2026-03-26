@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:meditrack/modals/medicine_details_modal.dart';
 import 'package:meditrack/modals/medicine_modal.dart';
 import 'package:meditrack/pages/stocks.dart';
-import 'package:meditrack/tutorials/dashboard_tutorial.dart';
+import 'package:meditrack/modals/settings_modal.dart';
 import 'package:meditrack/services/medicine_icons.dart';
 import 'package:meditrack/services/notification_service.dart';
 import 'package:meditrack/services/medicine_storage.dart';
@@ -31,7 +31,7 @@ class MeditrackApp extends StatelessWidget {
 }
 
 // ---------------------------------------------------------
-// DASHBOARD SCREEN (Reminders) - UPDATED CONTRAST
+// DASHBOARD SCREEN (Reminders) - UPDATED WITH TIME COLORS
 // ---------------------------------------------------------
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -41,6 +41,7 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  int _selectedTabIndex = 0;
   static const String _takenRemindersStorageKey = 'taken_reminders_v1';
   static const String _deductedRemindersStorageKey = 'deducted_reminders_v1';
 
@@ -54,20 +55,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Set<String> _deductedReminderKeys = <String>{};
   int _stockCount = 0;
   bool _isLoading = true;
-  bool _isTestingEscalationSound = false;
   DateTime _selectedDate = DateTime.now();
 
-  // Updated color palette for better visibility
+  // Color palette
   final Color backgroundColor = const Color(0xFFF4F5F0);
   final Color cardColor = Colors.white;
   final Color textFieldColor = const Color(0xFFE8E8E2);
   final Color textDark = const Color(0xFF1A1A1A); // High contrast black
-  final Color textLight = const Color(
-    0xFF757575,
-  ); // Darker grey for settings icon & standard light text
-  final Color textFaint = const Color(
-    0xFF8B9084,
-  ); // Much darker olive-grey for hints, now highly visible!
+  final Color textLight = const Color(0xFF757575);
+  final Color textFaint = const Color(0xFF8B9084);
+
+  // New High-Contrast Subtitle color (Fixing the greyed out text issue)
+  final Color textAccessibleSubtitle = const Color(0xFF616161);
+
+  // Time of Day Colors
+  final Color morningColor = const Color(0xFF56BFA8); // Teal from image
+  final Color afternoonColor = const Color(0xFFFFB74D); // Warm Orange
+  final Color nightColor = const Color(0xFF7986CB); // Indigo
 
   @override
   void initState() {
@@ -299,9 +303,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       medicineCreatedAtMillis:
           reminder.medicine.createdAt.millisecondsSinceEpoch,
       scheduledAt: scheduledAt,
-    ).catchError((_) {
-      // Continue local completion flow even if notification cancellation fails.
-    });
+    ).catchError((_) {});
 
     final int doseCount = _extractDoseCount(reminder.medicine.doseAmount);
     bool deducted = false;
@@ -330,7 +332,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     final String message = deducted
         ? 'Deducted $doseCount pill${doseCount == 1 ? '' : 's'} from ${reminder.medicine.name} stock.'
-        : 'Reminder marked done. No matching stock record found for ${reminder.medicine.name}.';
+        : 'Reminder marked done.';
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(message)));
@@ -368,64 +370,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  Future<void> _runEscalationSoundTest() async {
-    if (_isTestingEscalationSound) {
-      return;
-    }
-
-    setState(() {
-      _isTestingEscalationSound = true;
-    });
-
-    try {
-      final bool hasAccess =
-          await NotificationService.ensureNotificationAccess();
-      if (!hasAccess) {
-        if (!mounted) {
-          return;
-        }
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Notifications are disabled. Enable them in system settings.',
-            ),
-          ),
-        );
-        return;
-      }
-
-      await NotificationService.scheduleEscalationTestSequence(
-        baseNotificationId: DateTime.now().millisecondsSinceEpoch ~/ 1000,
-      );
-
-      if (!mounted) {
-        return;
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Escalation test scheduled: in 5 seconds, then +10s and +20s.',
-          ),
-        ),
-      );
-    } catch (_) {
-      if (!mounted) {
-        return;
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Unable to schedule escalation test right now.'),
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isTestingEscalationSound = false;
-        });
-      }
-    }
-  }
-
   String _buildSubtitle(MedicineRecord medicine) {
     final String dose = medicine.doseAmount.trim();
     final String frequency = medicine.frequency.trim();
@@ -447,324 +391,171 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Scaffold(
       backgroundColor: backgroundColor,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 16),
-
-              // 1. Top Bar (Logo + Settings)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // Left side: Sun icon and App Name
-                  Row(
-                    children: [
-                      Icon(Icons.wb_sunny_outlined, color: textFaint, size: 22),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Meditrack',
-                        style: TextStyle(
-                          color: textFaint,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  // Right side: Help + Settings buttons
-                  Row(
-                    children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: cardColor,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.03),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
+        child: _selectedTabIndex == 0
+            ? Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 12),
+                    // 1. Top Bar (Logo + Settings)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.wb_sunny_outlined,
+                              color: textFaint,
+                              size: 22,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Meditrack',
+                              style: TextStyle(
+                                color: textFaint,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ],
                         ),
-                        child: IconButton(
-                          tooltip: 'Help sections',
-                          icon: Icon(
-                            Icons.help_outline,
-                            color: textLight,
-                            size: 24,
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: cardColor,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.03),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
                           ),
-                          onPressed: _openHelpSectionsPopup,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: cardColor,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.03),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
+                          child: IconButton(
+                            icon: Icon(
+                              Icons.settings_outlined,
+                              color: textLight,
+                              size: 24,
                             ),
-                          ],
-                        ),
-                        child: IconButton(
-                          icon: Icon(
-                            Icons.settings_outlined,
-                            color: textLight,
-                            size: 24,
+                            onPressed: () {
+                              showModalBottomSheet(
+                                context: context,
+                                isScrollControlled: true,
+                                useSafeArea: true,
+                                backgroundColor: Colors.transparent,
+                                builder: (BuildContext context) =>
+                                    const SettingsModal(),
+                              );
+                            },
                           ),
-                          onPressed: _openSettingsMenu,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 32),
-
-              // 2. Title
-              Showcase(
-                key: _titleShowcaseKey,
-                title: 'Dashboard',
-                description:
-                    'This is your reminders dashboard where upcoming medicines are grouped by time of day.',
-                child: Text(
-                  'Reminders',
-                  style: TextStyle(
-                    fontSize: 38,
-                    fontWeight: FontWeight
-                        .w400, // Slightly bolder than w300 for better reading
-                    color: textDark,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              // Date selector row
-              Showcase(
-                key: _dateSelectorShowcaseKey,
-                title: 'Pick a day',
-                description:
-                    'Use these chips to switch dates and review reminders for each day.',
-                child: _buildDateSelector(),
-              ),
-              const SizedBox(height: 24),
-
-              // 3. Floating Input Box (Turned into a button to trigger modal)
-              Showcase(
-                key: _addReminderShowcaseKey,
-                title: 'Add medication',
-                description:
-                    'Tap this card to schedule a new medicine reminder.',
-                child: GestureDetector(
-                  onTap: _openMedicineModal,
-                  child: Container(
-                    padding: const EdgeInsets.fromLTRB(20, 10, 10, 10),
-                    decoration: BoxDecoration(
-                      color: cardColor,
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.04),
-                          blurRadius: 20,
-                          offset: const Offset(0, 10),
                         ),
                       ],
                     ),
-                    child: Row(
+                    const SizedBox(height: 22),
+                    // 2. Title and Schedule Medication button
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        // Simulated Text Input Field
                         Expanded(
                           child: Text(
-                            'Schedule Medications..',
+                            'Reminders',
                             style: TextStyle(
-                              color: textFaint,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w400,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w600,
+                              color: textDark,
+                              letterSpacing: -0.5,
                             ),
                           ),
                         ),
-
-                        // Add (+) Button
-                        Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            color: textFieldColor,
-                            borderRadius: BorderRadius.circular(16),
+                        ElevatedButton.icon(
+                          onPressed: _openMedicineModal,
+                          icon: const Icon(Icons.add, color: Colors.white),
+                          label: const Text(
+                            'Schedule Medication',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.1,
+                            ),
                           ),
-                          child: const Icon(Icons.add, color: Colors.white),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: textDark,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 14,
+                              horizontal: 18,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(18),
+                            ),
+                          ),
                         ),
                       ],
                     ),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              // 4. Helper Text below input
-              Row(
-                children: [
-                  Text(
-                    'Try: "urgent" for Priority',
-                    style: TextStyle(
-                      color: textFaint,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                    child: Icon(Icons.circle, size: 5, color: textFaint),
-                  ),
-                  Text(
-                    '"tomorrow" for Date',
-                    style: TextStyle(
-                      color: textFaint,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 14),
-
-              Showcase(
-                key: _stockShowcaseKey,
-                title: 'Manage stock',
-                description:
-                    'Open stock to track inventory and keep medicine quantities up to date.',
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (BuildContext context) => const StockScreen(),
+                    const SizedBox(height: 12),
+                    // Date selector row
+                    _buildDateSelector(),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        Text(
+                          '$_stockCount stock item${_stockCount == 1 ? '' : 's'} tracked',
+                          style: TextStyle(
+                            color: textFaint,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                      ).then((_) => _loadStocks());
-                    },
-                    style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: textFaint.withOpacity(0.35)),
-                      backgroundColor: cardColor,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 10,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
+                        const SizedBox(width: 18),
+                        Text(
+                          '${_medicines.length} reminder${_medicines.length == 1 ? '' : 's'} saved',
+                          style: TextStyle(
+                            color: textFaint,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
-                    icon: Icon(
-                      Icons.inventory_2_outlined,
-                      color: textDark,
-                      size: 18,
+                    const SizedBox(height: 8),
+                    Expanded(
+                      child: _isLoading
+                          ? const Center(child: CircularProgressIndicator())
+                          : _buildRemindersForSelectedDate(),
                     ),
-                    label: Text(
-                      'Go to Stock',
-                      style: TextStyle(
-                        color: textDark,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
+                    const SizedBox(height: 4),
+                  ],
                 ),
-              ),
-
-              const SizedBox(height: 8),
-
-              Align(
-                alignment: Alignment.centerLeft,
-                child: OutlinedButton.icon(
-                  onPressed: _isTestingEscalationSound
-                      ? null
-                      : _runEscalationSoundTest,
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: textFaint.withOpacity(0.35)),
-                    backgroundColor: cardColor,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 10,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  icon: Icon(
-                    Icons.notifications_active_outlined,
-                    color: textDark,
-                    size: 18,
-                  ),
-                  label: Text(
-                    _isTestingEscalationSound
-                        ? 'Scheduling test...'
-                        : 'Test Escalation Sound',
-                    style: TextStyle(
-                      color: textDark,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 8),
-
-              Text(
-                '$_stockCount stock item${_stockCount == 1 ? '' : 's'} tracked',
-                style: TextStyle(
-                  color: textFaint,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-
-              const SizedBox(height: 20),
-
-              Expanded(
-                child: _isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : _buildRemindersForSelectedDate(),
-              ),
-
-              const SizedBox(height: 16),
-
-              // 5. Bottom Status Text
-              Text(
-                '${_medicines.length} reminder${_medicines.length == 1 ? '' : 's'} saved',
-                style: TextStyle(
-                  color: textFaint,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600, // Thicker weight for visibility
-                ),
-              ),
-
-              // Bottom padding
-              const SizedBox(height: 40),
-            ],
+              )
+            : const StockScreen(),
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedTabIndex,
+        onTap: (int index) {
+          setState(() {
+            _selectedTabIndex = index;
+            if (index == 1) _loadStocks();
+          });
+        },
+        backgroundColor: cardColor,
+        selectedItemColor: textDark,
+        unselectedItemColor: textFaint,
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.alarm), label: 'Reminders'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.inventory_2_outlined),
+            label: 'Stocks',
           ),
-        ),
+        ],
       ),
     );
   }
 
-  // Helper Methods scoped correctly within the State class
   Widget _buildDateSelector() {
-    // Show 7 days: 3 before, today, 3 after
     final DateTime today = DateTime.now();
     final List<DateTime> days = List.generate(
       7,
@@ -791,6 +582,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 selected: isSelected,
                 selectedColor: const Color(0xFF8BBA91),
                 backgroundColor: cardColor,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
                 onSelected: (_) {
                   setState(() {
                     _selectedDate = date;
@@ -806,7 +600,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildRemindersForSelectedDate() {
-    // Gather all reminders for the selected date
     final List<_ReminderInstance> reminders = _expandRemindersForDate(
       _selectedDate,
     );
@@ -823,7 +616,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       );
     }
 
-    // Group by time of day
     final Map<String, List<_ReminderInstance>> grouped = {
       'Morning': [],
       'Afternoon': [],
@@ -839,7 +631,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         grouped['Night']!.add(r);
       }
     }
-    // Sort each group by time
     for (final group in grouped.values) {
       group.sort((a, b) => a.time.compareTo(b.time));
     }
@@ -849,7 +640,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         for (final period in ['Morning', 'Afternoon', 'Night'])
           if (grouped[period]!.isNotEmpty) ...[
             Padding(
-              padding: const EdgeInsets.only(top: 16, bottom: 6, left: 4),
+              padding: const EdgeInsets.only(top: 16, bottom: 8, left: 4),
               child: Text(
                 period,
                 style: TextStyle(
@@ -871,79 +662,151 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final String reminderKey = _reminderStorageKey(reminder, _selectedDate);
     final bool isChecked = _takenReminderKeys.contains(reminderKey);
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
+    // Determine period colors based on the time
+    Color periodColor;
+    final int hour = reminder.time.hour;
+    if (hour >= 5 && hour < 12) {
+      periodColor = morningColor;
+    } else if (hour >= 12 && hour < 18) {
+      periodColor = afternoonColor;
+    } else {
+      periodColor = nightColor;
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: cardColor,
         borderRadius: BorderRadius.circular(18),
-        onTap: () => _openMedicineDetailsModal(medicine),
-        child: Container(
-          margin: const EdgeInsets.only(bottom: 10),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          decoration: BoxDecoration(
-            color: cardColor,
-            borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
           ),
-          child: Row(
-            children: [
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE7EFE4),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  MedicineIcons.resolve(medicine.iconKey),
-                  color: const Color(0xFF5C7A58),
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                reminder.time.format(context),
-                style: TextStyle(
-                  color: textDark,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      medicine.name,
-                      style: TextStyle(
-                        color: textDark,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: () => _openMedicineDetailsModal(medicine),
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // NEW: Colored Left Border Indicator
+                Container(
+                  width: 6,
+                  decoration: BoxDecoration(
+                    color: periodColor,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(18),
+                      bottomLeft: Radius.circular(18),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _buildSubtitle(medicine),
-                      style: TextStyle(
-                        color: textFaint,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-              Checkbox(
-                value: isChecked,
-                onChanged: (!isToday || isChecked)
-                    ? null
-                    : (bool? value) {
-                        if (value == true) {
-                          _markReminderAsTaken(reminder);
-                        }
-                      },
-                activeColor: const Color(0xFF8BBA91),
-              ),
-            ],
+
+                // Card Content
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
+                    child: Row(
+                      children: [
+                        // Medicine Icon
+                        Container(
+                          width: 38,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE7EFE4),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(
+                            MedicineIcons.resolve(medicine.iconKey),
+                            color: const Color(0xFF5C7A58),
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+
+                        // Time
+                        Text(
+                          reminder.time.format(context),
+                          style: TextStyle(
+                            color: textDark,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+
+                        // Text Information (Name & Accessible Subtitle)
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                medicine.name,
+                                style: TextStyle(
+                                  color: textDark,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                _buildSubtitle(medicine),
+                                style: TextStyle(
+                                  // NEW: Fixed grey text issue - highly readable dark grey
+                                  color: textAccessibleSubtitle,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // NEW: Large accessible custom checkbox tap target
+                        GestureDetector(
+                          onTap: (!isToday || isChecked)
+                              ? null
+                              : () => _markReminderAsTaken(reminder),
+                          child: Container(
+                            width: 36,
+                            height: 36,
+                            margin: const EdgeInsets.only(left: 8),
+                            decoration: BoxDecoration(
+                              color: isChecked
+                                  ? const Color(0xFF8BBA91)
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: isChecked
+                                    ? const Color(0xFF8BBA91)
+                                    : const Color(0xFFBDBDBD),
+                                width: 2.5,
+                              ),
+                            ),
+                            child: isChecked
+                                ? const Icon(
+                                    Icons.check,
+                                    color: Colors.white,
+                                    size: 24,
+                                  )
+                                : null,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -953,7 +816,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List<_ReminderInstance> _expandRemindersForDate(DateTime date) {
     final List<_ReminderInstance> result = [];
     for (final medicine in _medicines) {
-      // If range is set, show for each day in range
       if (medicine.reminderStartDate != null &&
           medicine.reminderEndDate != null &&
           medicine.specificTime != null) {
@@ -980,7 +842,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           );
         }
       } else if (medicine.specificTime != null) {
-        // Single reminder
         final DateTime d = DateTime(date.year, date.month, date.day);
         final DateTime t = DateTime(
           medicine.specificTime!.year,
@@ -1016,7 +877,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 }
 
-// Helper class defined completely outside the widget build block
 class _ReminderInstance {
   final MedicineRecord medicine;
   final TimeOfDay time;
@@ -1024,7 +884,7 @@ class _ReminderInstance {
 }
 
 // ---------------------------------------------------------
-// LOGIN SCREEN (Updated contrast colors to match)
+// LOGIN SCREEN (RESTORED - Exactly as requested)
 // ---------------------------------------------------------
 class MeditrackLoginScreen extends StatelessWidget {
   const MeditrackLoginScreen({super.key});
@@ -1035,7 +895,7 @@ class MeditrackLoginScreen extends StatelessWidget {
   final Color buttonColor = const Color(0xFF6E765D);
   final Color iconGreenColor = const Color(0xFF87A884);
   final Color textDark = const Color(0xFF1A1A1A);
-  final Color textLight = const Color(0xFF757575); // Darkened for visibility
+  final Color textLight = const Color(0xFF757575);
 
   @override
   Widget build(BuildContext context) {
@@ -1149,7 +1009,6 @@ class MeditrackLoginScreen extends StatelessWidget {
                   height: 56,
                   child: ElevatedButton(
                     onPressed: () {
-                      // Navigate to dashboard on click
                       Navigator.pushReplacement(
                         context,
                         MaterialPageRoute(
