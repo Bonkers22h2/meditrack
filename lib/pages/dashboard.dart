@@ -36,10 +36,7 @@ class MeditrackApp extends StatelessWidget {
 // DASHBOARD SCREEN (Reminders) - UPDATED WITH TIME COLORS
 // ---------------------------------------------------------
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({
-    super.key,
-    this.showFirstLoginSectionsPopup = false,
-  });
+  const DashboardScreen({super.key, this.showFirstLoginSectionsPopup = false});
 
   final bool showFirstLoginSectionsPopup;
 
@@ -125,7 +122,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _showFirstLoginSectionsPopupThenTutorial() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     final bool hasSeenSectionsIntro =
-      prefs.getBool(TutorialPreferences.firstLoginSectionsSeenKey) ?? false;
+        prefs.getBool(TutorialPreferences.firstLoginSectionsSeenKey) ?? false;
 
     if (!mounted) {
       return;
@@ -151,12 +148,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _openHelpSectionsPopup() async {
-    final DashboardHelpSection? selectedSection = await showDashboardHelpSectionsPopup(
-      context: context,
-      textDark: textDark,
-      textLight: textLight,
-      textFaint: textFaint,
-    );
+    final DashboardHelpSection? selectedSection =
+        await showDashboardHelpSectionsPopup(
+          context: context,
+          textDark: textDark,
+          textLight: textLight,
+          textFaint: textFaint,
+        );
 
     if (selectedSection != null) {
       switch (selectedSection) {
@@ -176,13 +174,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _openMedicineModal(startScheduleTutorial: true);
           break;
         case DashboardHelpSection.manageStocks:
-          Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (BuildContext context) => const StockScreen(
-                startTutorial: true,
-              ),
-            ),
-          ).then((_) => _loadStocks());
+          Navigator.of(context)
+              .push(
+                MaterialPageRoute<void>(
+                  builder: (BuildContext context) =>
+                      const StockScreen(startTutorial: true),
+                ),
+              )
+              .then((_) => _loadStocks());
           break;
       }
     }
@@ -328,9 +327,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (BuildContext context) => MedicineModal(
-        startScheduleTutorial: startScheduleTutorial,
-      ),
+      builder: (BuildContext context) =>
+          MedicineModal(startScheduleTutorial: startScheduleTutorial),
     );
 
     if (didSave == true) {
@@ -386,23 +384,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.wb_sunny_outlined,
-                              color: textFaint,
-                              size: 22,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Meditrack',
-                              style: TextStyle(
-                                color: textFaint,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
+                        Expanded(
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Padding(
+                              padding: const EdgeInsets.only(left: 8),
+                              child: SizedBox(
+                                height: 40,
+                                child: Image.asset(
+                                  'android/app/src/main/res/assets/icons (1).png',
+                                  fit: BoxFit.contain,
+                                ),
                               ),
                             ),
-                          ],
+                          ),
                         ),
                         Row(
                           children: [

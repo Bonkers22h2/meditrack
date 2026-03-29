@@ -24,6 +24,7 @@ class NotificationService {
   static const String _level1Sound = 'reminder_level_1';
   static const String _level2Sound = 'reminder_level_2';
   static const String _level3Sound = 'reminder_level_3';
+  static const String _notificationIcon = 'logo';
 
   static const NotificationDetails _defaultNotificationDetails =
       NotificationDetails(
@@ -31,6 +32,7 @@ class NotificationService {
           _defaultChannelId,
           'Medicine Reminders',
           channelDescription: 'Reminder notifications for medicine intake',
+          icon: _notificationIcon,
           importance: Importance.max,
           priority: Priority.high,
           playSound: true,
@@ -48,7 +50,7 @@ class NotificationService {
     await _configureLocalTimezone();
 
     const AndroidInitializationSettings androidInitSettings =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
+        AndroidInitializationSettings('@drawable/logo');
     const DarwinInitializationSettings iosInitSettings =
         DarwinInitializationSettings();
 
@@ -88,15 +90,11 @@ class NotificationService {
       tz.local,
     );
 
-    final String body = (doseAmount == null || doseAmount.trim().isEmpty)
-        ? 'Time to take your medicine.'
-        : 'Time to take $doseAmount of your medicine.';
-
     await _scheduleEscalatingReminder(
       medicineCreatedAtMillis: medicineCreatedAtMillis,
       scheduledDate: scheduledDate,
-      title: 'Medicine Reminder: $medicineName',
-      body: body,
+      medicineName: medicineName,
+      doseAmount: doseAmount,
     );
   }
 
@@ -128,10 +126,6 @@ class NotificationService {
       return 0;
     }
 
-    final String body = (doseAmount == null || doseAmount.trim().isEmpty)
-        ? 'Time to take your medicine.'
-        : 'Time to take $doseAmount of your medicine.';
-
     DateTime cursor = normalizedStart;
     final DateTime now = DateTime.now();
     int scheduledCount = 0;
@@ -155,8 +149,8 @@ class NotificationService {
         await _scheduleEscalatingReminder(
           medicineCreatedAtMillis: medicineCreatedAtMillis,
           scheduledDate: scheduledDate,
-          title: 'Medicine Reminder: $medicineName',
-          body: body,
+          medicineName: medicineName,
+          doseAmount: doseAmount,
         );
         scheduledCount += 1;
       }
@@ -219,10 +213,12 @@ class NotificationService {
 
     final tz.TZDateTime now = tz.TZDateTime.now(tz.local);
     for (int attempt = 0; attempt < _escalationAttempts; attempt += 1) {
+      final int alertLevel = _alertLevelForAttempt(attempt);
       await _zonedScheduleWithFallback(
         notificationId: baseNotificationId + attempt,
-        title: 'Escalation Test ${attempt + 1}/$_escalationAttempts',
-        body: 'Testing reminder sound level ${attempt + 1}.',
+        title: 'Reminder Test',
+        body:
+            'This is a preview of reminder style $alertLevel. Attempt ${attempt + 1} of $_escalationAttempts.',
         scheduledDate: now.add(initialDelay + (stepDelay * attempt)),
         notificationDetails: _notificationDetailsForAttempt(attempt),
       );
@@ -259,8 +255,8 @@ class NotificationService {
   static Future<void> _scheduleEscalatingReminder({
     required int medicineCreatedAtMillis,
     required tz.TZDateTime scheduledDate,
-    required String title,
-    required String body,
+    required String medicineName,
+    String? doseAmount,
   }) async {
     final String reminderIdentity = _buildReminderIdentity(
       medicineCreatedAtMillis: medicineCreatedAtMillis,
@@ -269,14 +265,20 @@ class NotificationService {
 
     final List<Future<void>> scheduleOperations = <Future<void>>[];
     for (int attempt = 0; attempt < _totalReminderAttempts; attempt += 1) {
+      final _NotificationContent content = _notificationContentForAttempt(
+        attempt: attempt,
+        medicineName: medicineName,
+        doseAmount: doseAmount,
+        scheduledDate: scheduledDate,
+      );
       scheduleOperations.add(
         _zonedScheduleWithFallback(
           notificationId: _notificationIdForAttempt(
             reminderIdentity: reminderIdentity,
             attempt: attempt,
           ),
-          title: title,
-          body: body,
+          title: content.title,
+          body: content.body,
           scheduledDate: scheduledDate.add(
             Duration(minutes: _escalationInterval.inMinutes * attempt),
           ),
@@ -431,13 +433,14 @@ class NotificationService {
   }
 
   static NotificationDetails _notificationDetailsForAttempt(int attempt) {
-    final int safeAttempt = attempt.clamp(0, _escalationAttempts - 1);
-    if (safeAttempt == 0) {
+    final int alertLevel = _alertLevelForAttempt(attempt);
+    if (alertLevel == 1) {
       return NotificationDetails(
         android: AndroidNotificationDetails(
           _level1ChannelId,
           'Medicine Reminders Level 1',
           channelDescription: 'Initial medicine reminder alert',
+          icon: _notificationIcon,
           importance: Importance.high,
           priority: Priority.high,
           playSound: true,
@@ -449,12 +452,13 @@ class NotificationService {
       );
     }
 
-    if (safeAttempt == 1) {
+    if (alertLevel == 2) {
       return NotificationDetails(
         android: AndroidNotificationDetails(
           _level2ChannelId,
           'Medicine Reminders Level 2',
           channelDescription: 'Follow-up medicine reminder alert',
+          icon: _notificationIcon,
           importance: Importance.max,
           priority: Priority.high,
           playSound: true,
@@ -480,6 +484,7 @@ class NotificationService {
         _level3ChannelId,
         'Medicine Reminders Level 3',
         channelDescription: 'Urgent follow-up medicine reminder alert',
+        icon: _notificationIcon,
         importance: Importance.max,
         priority: Priority.max,
         playSound: true,
@@ -503,6 +508,63 @@ class NotificationService {
         interruptionLevel: InterruptionLevel.timeSensitive,
       ),
     );
+  }
+
+  static _NotificationContent _notificationContentForAttempt({
+    required int attempt,
+    required String medicineName,
+    String? doseAmount,
+    required tz.TZDateTime scheduledDate,
+  }) {
+    final int alertLevel = _alertLevelForAttempt(attempt);
+    final String trimmedDose = doseAmount?.trim() ?? '';
+    final String doseText = trimmedDose.isEmpty
+        ? 'Dose: as prescribed.'
+        : 'Dose: $trimmedDose.';
+    final String scheduledTime = _formatClockTime(scheduledDate);
+
+    if (alertLevel == 1) {
+      return _NotificationContent(
+        title: 'Reminder: $medicineName',
+        body:
+            'Scheduled for $scheduledTime. $doseText Please take it now and mark it as taken in MediTrack.',
+      );
+    }
+
+    if (alertLevel == 2) {
+      return _NotificationContent(
+        title: 'Reminder Follow-up: $medicineName',
+        body:
+            'Still pending since $scheduledTime. $doseText Please take it as soon as possible and confirm in the app.',
+      );
+    }
+
+    return _NotificationContent(
+      title: 'Urgent Reminder: $medicineName',
+      body:
+          'Urgent: this dose remains unconfirmed since $scheduledTime. $doseText Take it immediately and update your medication log.',
+    );
+  }
+
+  static int _alertLevelForAttempt(int attempt) {
+    if (attempt <= 0) {
+      return 1;
+    }
+    if (attempt == 1) {
+      return 2;
+    }
+    return 3;
+  }
+
+  static String _formatClockTime(DateTime dateTime) {
+    int hour = dateTime.hour;
+    final String period = hour >= 12 ? 'PM' : 'AM';
+    hour = hour % 12;
+    if (hour == 0) {
+      hour = 12;
+    }
+    final String minute = dateTime.minute.toString().padLeft(2, '0');
+    return '$hour:$minute $period';
   }
 
   static String _buildReminderIdentity({
@@ -532,4 +594,11 @@ class NotificationService {
     }
     return hash & 0x7FFFFFFF;
   }
+}
+
+class _NotificationContent {
+  const _NotificationContent({required this.title, required this.body});
+
+  final String title;
+  final String body;
 }
