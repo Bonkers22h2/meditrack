@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:meditrack/pages/dashboard.dart';
 import 'package:meditrack/services/notification_service.dart';
+import 'package:meditrack/tutorials/main_tutorial.dart';
 import 'package:meditrack/tutorials/schedule_tutorial.dart';
 import 'package:meditrack/widgets/intro_popup_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -12,13 +13,17 @@ Future<void> main() async {
   runApp(const MeditrackApp());
 }
 
+const String selectedUserRoleKey = 'selected_user_role_v1';
+const String caregiverRole = 'caregiver';
+const String normalUserRole = 'normal_user';
+
 class MeditrackApp extends StatelessWidget {
   const MeditrackApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Meditrack Login',
+      title: 'Meditrack',
       debugShowCheckedModeBanner: false,
       builder: (BuildContext context, Widget? child) {
         return ShowCaseWidget(
@@ -34,7 +39,51 @@ class MeditrackApp extends StatelessWidget {
         fontFamily:
             'Roboto', // Default flutter font, resembles the clean sans-serif in the image
       ),
-      home: const MeditrackLoginScreen(),
+      home: const AppStartupScreen(),
+    );
+  }
+}
+
+class AppStartupScreen extends StatefulWidget {
+  const AppStartupScreen({super.key});
+
+  @override
+  State<AppStartupScreen> createState() => _AppStartupScreenState();
+}
+
+class _AppStartupScreenState extends State<AppStartupScreen> {
+  @override
+  void initState() {
+    super.initState();
+    _routeFromSavedRole();
+  }
+
+  Future<void> _routeFromSavedRole() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final String? selectedRole = prefs.getString(selectedUserRoleKey);
+
+    if (!mounted) {
+      return;
+    }
+
+    final Widget destination;
+    if (selectedRole == caregiverRole) {
+      destination = const CaregiverDashboardScreen();
+    } else if (selectedRole == normalUserRole) {
+      destination = const DashboardScreen(showFirstLoginSectionsPopup: true);
+    } else {
+      destination = const MeditrackLoginScreen();
+    }
+
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(builder: (BuildContext context) => destination),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: SafeArea(child: Center(child: CircularProgressIndicator())),
     );
   }
 }
@@ -48,8 +97,10 @@ class MeditrackLoginScreen extends StatefulWidget {
 
 class _MeditrackLoginScreenState extends State<MeditrackLoginScreen> {
   static const String _loginIntroSeenKey = 'login_intro_popup_seen_v1';
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
+
+  final GlobalKey _roleCardShowcaseKey = GlobalKey();
+  final GlobalKey _caregiverButtonShowcaseKey = GlobalKey();
+  final GlobalKey _normalUserButtonShowcaseKey = GlobalKey();
 
   /// This is the content for the introductory popup that appears on the first launch of the app.
   final List<IntroPopupPage> _introPages = const <IntroPopupPage>[
@@ -59,19 +110,18 @@ class _MeditrackLoginScreenState extends State<MeditrackLoginScreen> {
           'Our goal is to make managing your medications as simple as possible. Instead of typing long medical names, we use icons, colors, and simple taps to help you stay on track. This short guide will walk you through the first few steps, so you feel comfortable using the app.',
     ),
     IntroPopupPage(
-      title: 'Create Your Account',
-      subtitle: 'Why do I need an account?',
+      title: 'Choose Your Role',
+      subtitle: 'Caregiver or normal user?',
       description:
-          'Your account helps us keep your medicine information private and secure. It lets you share access with a family member if you want, and makes sure your reminders are saved even if you switch phones. All your information is private and can only be accessed by you and your caregivers.',
+          'On the first screen, select whether you are a caregiver or a normal user taking maintenance medication. This helps open the right dashboard for your role.',
       useQuoteBlockForIntroText: true,
       steps: <String>[
-        'Tap “Register”.',
-        'Enter your Email Address or Phone Number.',
-        'Enter the one-time code (OTP) sent to verify your identity.',
-        'Enter a secure password.',
+        'Tap “Caregiver” if you are assisting someone else.',
+        'Tap “Normal User (Maintenance Medication)” if the medications are yours.',
+        'You will be sent directly to the correct dashboard.',
       ],
       note:
-          'If you forget your password later, tap "Forgot Password?" on the login screen to reset it by email or SMS.',
+          'You can update this flow later when full account features are added.',
     ),
     IntroPopupPage(
       title: 'Adding a Family Member or Caregiver',
@@ -87,14 +137,26 @@ class _MeditrackLoginScreenState extends State<MeditrackLoginScreen> {
   @override
   void initState() {
     super.initState();
-    _showIntroPopupIfNeeded();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) {
+        return;
+      }
+
+      await _showIntroPopupIfNeeded();
+      await _startMainTutorialIfNeeded();
+    });
   }
 
-  @override
-  void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    super.dispose();
+  Future<void> _startMainTutorialIfNeeded() async {
+    await startMainTutorialIfNeeded(
+      context: context,
+      isMounted: () => mounted,
+      steps: buildMainTutorialSteps(
+        roleCardShowcaseKey: _roleCardShowcaseKey,
+        caregiverButtonShowcaseKey: _caregiverButtonShowcaseKey,
+        normalUserButtonShowcaseKey: _normalUserButtonShowcaseKey,
+      ),
+    );
   }
 
   /// Show intro popup for first time users.
@@ -106,56 +168,53 @@ class _MeditrackLoginScreenState extends State<MeditrackLoginScreen> {
       return;
     }
 
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (!mounted) {
-        return;
-      }
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return IntroPopupDialog(pages: _introPages);
+      },
+    );
 
-      await showDialog<void>(
-        context: context,
-        barrierDismissible: false,
-        builder: (BuildContext context) {
-          return IntroPopupDialog(pages: _introPages);
-        },
-      );
-
-      await prefs.setBool(_loginIntroSeenKey, true);
-    });
+    await prefs.setBool(_loginIntroSeenKey, true);
   }
 
   // Custom Colors extracted from the image
   final Color backgroundColor = const Color(0xFFF4F5F0);
   final Color cardColor = Colors.white;
-  final Color textFieldColor = const Color(0xFFE8E8E2);
   final Color buttonColor = const Color(0xFF6E765D);
   final Color iconGreenColor = const Color(0xFF87A884);
   final Color textDark = const Color(0xFF1A1A1A);
   final Color textLight = const Color(0xFF9E9E9E);
 
-  Future<void> _handleLogin() async {
-    final String email = _emailController.text.trim();
-    final String password = _passwordController.text.trim();
+  Future<void> _openUserDashboard() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setString(selectedUserRoleKey, normalUserRole);
 
-    if (email == 'user' && password == 'user') {
-      if (!mounted) {
-        return;
-      }
-
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute<void>(
-          builder: (BuildContext context) => const DashboardScreen(
-            showFirstLoginSectionsPopup: true,
-          ),
-        ),
-      );
+    if (!mounted) {
       return;
     }
 
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        const SnackBar(content: Text('Invalid email or password')),
-      );
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(
+        builder: (BuildContext context) => const AppStartupScreen(),
+      ),
+    );
+  }
+
+  Future<void> _openCaregiverDashboard() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setString(selectedUserRoleKey, caregiverRole);
+
+    if (!mounted) {
+      return;
+    }
+
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(
+        builder: (BuildContext context) => const AppStartupScreen(),
+      ),
+    );
   }
 
   @override
@@ -212,7 +271,7 @@ class _MeditrackLoginScreenState extends State<MeditrackLoginScreen> {
 
                 // 3. Subtitle
                 Text(
-                  'Login / Sign up',
+                  'Who are you?',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w400,
@@ -222,104 +281,115 @@ class _MeditrackLoginScreenState extends State<MeditrackLoginScreen> {
 
                 const SizedBox(height: 40),
 
-                // 4. Input Card
-                Container(
-                  padding: const EdgeInsets.all(24.0),
-                  decoration: BoxDecoration(
-                    color: cardColor,
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.04),
-                        blurRadius: 20,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Email Label
-                      Text(
-                        'Email',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: textDark,
-                          fontWeight: FontWeight.w400,
+                // 4. Role Selection Card
+                Showcase(
+                  key: _roleCardShowcaseKey,
+                  title: 'Choose your role',
+                  description:
+                      'Pick caregiver if you assist someone else, or normal user if you take maintenance medication.',
+                  child: Container(
+                    padding: const EdgeInsets.all(24.0),
+                    decoration: BoxDecoration(
+                      color: cardColor,
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 20,
+                          offset: const Offset(0, 10),
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      // Email TextField
-                      _buildTextField(
-                        obscureText: false,
-                        controller: _emailController,
-                      ),
-
-                      const SizedBox(height: 20),
-
-                      // Password Label
-                      Text(
-                        'Password',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: textDark,
-                          fontWeight: FontWeight.w400,
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Select your role to continue',
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: textDark,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      // Password TextField
-                      _buildTextField(
-                        obscureText: true,
-                        controller: _passwordController,
-                      ),
-
-                      const SizedBox(height: 16),
-
-                      // Forgot Password Link
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: Text(
-                          'Forgot password?',
+                        const SizedBox(height: 20),
+                        Text(
+                          'If you are helping someone else, choose caregiver. If you are taking maintenance medication, choose normal user.',
                           style: TextStyle(
                             fontSize: 14,
                             color: textLight,
                             fontWeight: FontWeight.w400,
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
 
                 const SizedBox(height: 32),
 
-                // 5. Continue Button
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: ElevatedButton(
-                    onPressed: _handleLogin,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: buttonColor,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(28),
+                // 5. Caregiver Button
+                Showcase(
+                  key: _caregiverButtonShowcaseKey,
+                  title: 'Caregiver dashboard',
+                  description:
+                      'Tap here if you are monitoring someone else\'s medication routine.',
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: ElevatedButton(
+                      onPressed: _openCaregiverDashboard,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: textDark,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(28),
+                        ),
+                      ),
+                      child: const Text(
+                        'Caregiver',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: const [
-                        Text(
-                          'Continue',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                          ),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // 6. Normal User Button
+                Showcase(
+                  key: _normalUserButtonShowcaseKey,
+                  title: 'Normal user dashboard',
+                  description:
+                      'Tap here if you are taking maintenance medication and tracking your own reminders.',
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: ElevatedButton(
+                      onPressed: _openUserDashboard,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: buttonColor,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(28),
                         ),
-                        SizedBox(width: 8),
-                        Icon(Icons.arrow_forward, size: 20),
-                      ],
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: const [
+                          Text(
+                            'Normal User (Maintenance Medication)',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -332,27 +402,16 @@ class _MeditrackLoginScreenState extends State<MeditrackLoginScreen> {
       ),
     );
   }
+}
 
-  // Helper method to build the rounded, filled text fields
-  Widget _buildTextField({
-    required bool obscureText,
-    required TextEditingController controller,
-  }) {
-    return TextField(
-      obscureText: obscureText,
-      controller: controller,
-      decoration: InputDecoration(
-        filled: true,
-        fillColor: textFieldColor,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 20,
-          vertical: 16,
-        ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(20),
-          borderSide: BorderSide.none, // Removes the border completely
-        ),
-      ),
+class CaregiverDashboardScreen extends StatelessWidget {
+  const CaregiverDashboardScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Caregiver Dashboard')),
+      body: const SafeArea(child: SizedBox.expand()),
     );
   }
 }
