@@ -1,10 +1,12 @@
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:meditrack/services/medicine_icons.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class StockRecord {
   StockRecord({
+    this.iconKey = MedicineIcons.defaultIconKey,
     required this.medicineName,
     required this.currentStock,
     required this.lowStockThreshold,
@@ -12,6 +14,7 @@ class StockRecord {
     required this.createdAt,
   });
 
+  final String iconKey;
   final String medicineName;
   final int currentStock;
   final int lowStockThreshold;
@@ -20,6 +23,7 @@ class StockRecord {
 
   factory StockRecord.fromJson(Map<String, dynamic> json) {
     return StockRecord(
+      iconKey: (json['iconKey'] as String?) ?? MedicineIcons.defaultIconKey,
       medicineName: (json['medicineName'] as String?) ?? '',
       currentStock: (json['currentStock'] as int?) ?? 0,
       lowStockThreshold: (json['lowStockThreshold'] as int?) ?? 0,
@@ -31,6 +35,7 @@ class StockRecord {
 
   Map<String, dynamic> toJson() {
     return <String, dynamic>{
+      'iconKey': iconKey,
       'medicineName': medicineName,
       'currentStock': currentStock,
       'lowStockThreshold': lowStockThreshold,
@@ -153,6 +158,7 @@ class StockStorage {
     final StockRecord existing = stocks[index];
     final int updatedStock = max(0, existing.currentStock - amount);
     stocks[index] = StockRecord(
+      iconKey: existing.iconKey,
       medicineName: existing.medicineName,
       currentStock: updatedStock,
       lowStockThreshold: existing.lowStockThreshold,

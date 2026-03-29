@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:meditrack/services/medicine_icons.dart';
 import 'package:meditrack/services/stock_storage.dart';
 
 class StockEditModal extends StatefulWidget {
@@ -27,6 +28,7 @@ class _StockEditModalState extends State<StockEditModal> {
   late final TextEditingController _medicineNameController;
   late final TextEditingController _lowStockController;
   late final TextEditingController _currentStockController;
+  String _selectedIconKey = MedicineIcons.defaultIconKey;
   DateTime? _selectedExpiryDate;
 
   // Colors based on the provided design
@@ -53,6 +55,7 @@ class _StockEditModalState extends State<StockEditModal> {
     _currentStockController = TextEditingController(
       text: _currentStock.toString(),
     );
+    _selectedIconKey = initialRecord?.iconKey ?? MedicineIcons.defaultIconKey;
     _selectedExpiryDate = initialRecord?.expiryDate ?? widget.initialExpiryDate;
   }
 
@@ -122,6 +125,7 @@ class _StockEditModalState extends State<StockEditModal> {
     _currentStock = currentStock;
 
     final StockRecord result = StockRecord(
+      iconKey: _selectedIconKey,
       medicineName: medicineName,
       currentStock: _currentStock,
       lowStockThreshold: lowStock,
@@ -161,6 +165,54 @@ class _StockEditModalState extends State<StockEditModal> {
       'December',
     ];
     return months[month - 1];
+  }
+
+  Future<void> _showIconPicker() async {
+    final String? selected = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Choose stock icon',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: MedicineIcons.options.map((
+                    MedicineIconOption option,
+                  ) {
+                    final bool isSelected = option.key == _selectedIconKey;
+                    return ChoiceChip(
+                      label: Text(option.label),
+                      avatar: Icon(option.icon, size: 18),
+                      selected: isSelected,
+                      onSelected: (_) => Navigator.pop(context, option.key),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (selected == null) {
+      return;
+    }
+
+    setState(() {
+      _selectedIconKey = selected;
+    });
   }
 
   String? _expiringLabel() {
@@ -214,12 +266,20 @@ class _StockEditModalState extends State<StockEditModal> {
               alignment: Alignment.topCenter,
               children: [
                 // Image Circle
-                Container(
-                  width: 150,
-                  height: 150,
-                  decoration: BoxDecoration(
-                    color: circlePlaceholderColor,
-                    shape: BoxShape.circle,
+                GestureDetector(
+                  onTap: _showIconPicker,
+                  child: Container(
+                    width: 150,
+                    height: 150,
+                    decoration: BoxDecoration(
+                      color: circlePlaceholderColor,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      MedicineIcons.resolve(_selectedIconKey),
+                      size: 70,
+                      color: const Color(0xFF6F6F6F),
+                    ),
                   ),
                 ),
                 // Close Button (Top Right)
@@ -237,6 +297,12 @@ class _StockEditModalState extends State<StockEditModal> {
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 8),
+            TextButton.icon(
+              onPressed: _showIconPicker,
+              icon: const Icon(Icons.edit_outlined, size: 18),
+              label: const Text('Edit icon'),
             ),
 
             const SizedBox(height: 20),

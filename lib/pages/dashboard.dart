@@ -72,6 +72,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List<MedicineRecord> _medicines = <MedicineRecord>[];
   Set<String> _takenReminderKeys = <String>{};
   Set<String> _deductedReminderKeys = <String>{};
+  Map<String, String> _stockIconByMedicine = <String, String>{};
   int _stockCount = 0;
   bool _isLoading = true;
   DateTime _selectedDate = DateTime.now();
@@ -207,8 +208,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
       return;
     }
 
+    final Map<String, String> stockIconByMedicine = <String, String>{};
+    for (final StockRecord stock in stocks) {
+      final String key = stock.medicineName.trim().toLowerCase();
+      if (key.isEmpty) {
+        continue;
+      }
+      stockIconByMedicine[key] = stock.iconKey;
+    }
+
     setState(() {
       _stockCount = stocks.length;
+      _stockIconByMedicine = stockIconByMedicine;
     });
   }
 
@@ -700,6 +711,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildReminderCard(_ReminderInstance reminder) {
     final medicine = reminder.medicine;
+    final String iconKey =
+        _stockIconByMedicine[medicine.name.trim().toLowerCase()] ??
+        medicine.iconKey;
     final bool isToday = _isSameDay(_selectedDate, DateTime.now());
     final String reminderKey = _reminderStorageKey(reminder, _selectedDate);
     final bool isChecked = _takenReminderKeys.contains(reminderKey);
@@ -767,7 +781,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Icon(
-                            MedicineIcons.resolve(medicine.iconKey),
+                            MedicineIcons.resolve(iconKey),
                             color: const Color(0xFF5C7A58),
                             size: 20,
                           ),

@@ -21,10 +21,8 @@ class MedicineModal extends StatefulWidget {
   State<MedicineModal> createState() => _MedicineModalState();
 }
 
-class _MedicineModalState extends State<MedicineModal>
-    with SingleTickerProviderStateMixin {
+class _MedicineModalState extends State<MedicineModal> {
   int _currentTabIndex = 0;
-  late final TabController _tabController;
 
   final GlobalKey _scheduleDetailsShowcaseKey = GlobalKey();
   final GlobalKey _scheduleIconShowcaseKey = GlobalKey();
@@ -33,7 +31,8 @@ class _MedicineModalState extends State<MedicineModal>
   final GlobalKey _scheduleRangeShowcaseKey = GlobalKey();
   final GlobalKey _scheduleSaveShowcaseKey = GlobalKey();
 
-  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _medicineInputController =
+      TextEditingController();
   final TextEditingController _doseAmountController = TextEditingController();
   final TextEditingController _frequencyController = TextEditingController();
 
@@ -42,12 +41,11 @@ class _MedicineModalState extends State<MedicineModal>
   TimeOfDay? _reminderTime;
   String _selectedIconKey = MedicineIcons.defaultIconKey;
   bool _isSaving = false;
+  List<String> _selectedMedicines = <String>[];
   List<String> _stockMedicineNames = <String>[];
   Map<String, int> _stockCountByMedicine = <String, int>{};
   bool _isLoadingStockNames = true;
-  // Notification test logic moved to settings modal
 
-  // Custom colors matching your new design
   final Color modalBgColor = const Color(0xFFC0D1BD);
   final Color sectionHeaderColor = const Color(0xFF8BBA91);
   final Color inputBgColor = Colors.white;
@@ -59,17 +57,8 @@ class _MedicineModalState extends State<MedicineModal>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this)
-      ..addListener(() {
-        if (_tabController.indexIsChanging) {
-          setState(() {
-            _currentTabIndex = _tabController.index;
-          });
-        }
-      });
     _populateInitialValues();
     _loadMedicineNamesFromStocks();
-    // _refreshNotificationStatus() removed; notification logic is now in settings modal
 
     if (widget.startScheduleTutorial) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -84,8 +73,7 @@ class _MedicineModalState extends State<MedicineModal>
 
   @override
   void dispose() {
-    _tabController.dispose();
-    _nameController.dispose();
+    _medicineInputController.dispose();
     _doseAmountController.dispose();
     _frequencyController.dispose();
     super.dispose();
@@ -100,13 +88,11 @@ class _MedicineModalState extends State<MedicineModal>
         ? mediaQuery.viewInsets.bottom
         : mediaQuery.viewPadding.bottom;
 
-    // Wrap in a GestureDetector to dismiss keyboard on tap outside
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: AnimatedPadding(
         duration: const Duration(milliseconds: 150),
         curve: Curves.easeOut,
-        // Keep content above keyboard and system navigation bar.
         padding: EdgeInsets.only(bottom: bottomInset),
         child: Align(
           alignment: Alignment.bottomCenter,
@@ -122,30 +108,43 @@ class _MedicineModalState extends State<MedicineModal>
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  const SizedBox(height: 12),
+                  Container(
+                    width: 54,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.7),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
                     child: Row(
                       children: [
-                          Showcase(
-                            key: _scheduleIconShowcaseKey,
-                            title: 'Set an icon',
-                            description:
-                                'You can choose an icon to make this schedule easier to recognize later.',
-                            child: GestureDetector(
-                              onTap: _showIconPicker,
-                              child: Container(
-                                width: 60,
-                                height: 60,
-                                decoration: const BoxDecoration(
-                                  color: Colors.white,
-                                  shape: BoxShape.circle,
+                        Showcase(
+                          key: _scheduleIconShowcaseKey,
+                          title: 'Schedule details',
+                          description:
+                              'Set medicine names, dose, frequency, and schedule in one flow.',
+                          child: Container(
+                            width: 52,
+                            height: 52,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.08),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
                                 ),
-                                child: Icon(
-                                  MedicineIcons.resolve(_selectedIconKey),
-                                  color: sectionHeaderColor,
-                                  size: 32,
-                                ),
-                              ),
+                              ],
+                            ),
+                            child: Icon(
+                              Icons.medication_liquid_rounded,
+                              color: sectionHeaderColor,
+                              size: 28,
+                            ),
                           ),
                         ),
                         const SizedBox(width: 16),
@@ -154,7 +153,7 @@ class _MedicineModalState extends State<MedicineModal>
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Medicine Icon',
+                                'Schedule Medicines',
                                 style: TextStyle(
                                   fontSize: 16,
                                   color: textDark,
@@ -163,7 +162,7 @@ class _MedicineModalState extends State<MedicineModal>
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                'Tap icon to change',
+                                'Add medicines and schedule time range',
                                 style: TextStyle(
                                   fontSize: 13,
                                   color: textDark.withOpacity(0.75),
@@ -172,10 +171,6 @@ class _MedicineModalState extends State<MedicineModal>
                               ),
                             ],
                           ),
-                        ),
-                        TextButton(
-                          onPressed: _showIconPicker,
-                          child: const Text('Edit'),
                         ),
                         IconButton(
                           tooltip: 'Schedule tutorial',
@@ -187,36 +182,35 @@ class _MedicineModalState extends State<MedicineModal>
                   ),
                   Container(
                     margin: const EdgeInsets.symmetric(horizontal: 24),
-                    decoration: BoxDecoration(
-                      color: sectionHeaderColor,
-                      borderRadius: BorderRadius.circular(12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
                     ),
-                    child: TabBar(
-                      controller: _tabController,
-                      onTap: (int index) {
-                        setState(() {
-                          _currentTabIndex = index;
-                        });
-                      },
-                      labelColor: textDark,
-                      unselectedLabelColor: textDark.withOpacity(0.75),
-                      labelStyle: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.65),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.75),
+                        width: 1,
                       ),
-                      unselectedLabelStyle: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      indicator: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      indicatorSize: TabBarIndicatorSize.tab,
-                      dividerColor: Colors.transparent,
-                      tabs: const [
-                        Tab(text: 'Details'),
-                        Tab(text: 'Dosage'),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.auto_awesome,
+                          size: 18,
+                          color: textDark.withOpacity(0.8),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Schedule Details',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: textDark.withOpacity(0.9),
+                            letterSpacing: 0.2,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -230,13 +224,10 @@ class _MedicineModalState extends State<MedicineModal>
                       child: _buildCurrentTabContent(),
                     ),
                   ),
-
-                  // 5. Bottom Buttons Row
                   Padding(
                     padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
                     child: Row(
                       children: [
-                        // Clear Button
                         Expanded(
                           flex: 2,
                           child: ElevatedButton(
@@ -267,8 +258,6 @@ class _MedicineModalState extends State<MedicineModal>
                           ),
                         ),
                         const SizedBox(width: 16),
-
-                        // Save Button
                         Expanded(
                           flex: 3,
                           child: Showcase(
@@ -277,28 +266,20 @@ class _MedicineModalState extends State<MedicineModal>
                             description:
                                 'When you are done, tap here to save medication details and schedule reminders.',
                             child: ElevatedButton(
-                              onPressed: _isSaving
-                                  ? null
-                                  : () {
-                                      if (_currentTabIndex < 1) {
-                                        _goToTab(_currentTabIndex + 1);
-                                        return;
-                                      }
-                                      _saveMedicine();
-                                    },
+                              onPressed: _isSaving ? null : _saveMedicine,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: saveBtnColor,
                                 foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(20),
                                 ),
                                 elevation: 0,
                               ),
                               child: Text(
-                                _currentTabIndex < 1
-                                    ? 'Next'
-                                    : _isSaving
+                                _isSaving
                                     ? (isEditMode ? 'Updating...' : 'Saving...')
                                     : (isEditMode ? 'Update' : 'Save'),
                                 style: const TextStyle(
@@ -322,72 +303,240 @@ class _MedicineModalState extends State<MedicineModal>
   }
 
   Widget _buildCurrentTabContent() {
-    switch (_currentTabIndex) {
-      case 0:
-        return SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Showcase(
-                key: _scheduleDetailsShowcaseKey,
-                title: 'Choose medication type',
-                description:
-                    'This is where you pick which medicine you want to schedule before setting the dosage.',
-                child: _buildMedicationDropdownGroup(),
-              ),
-            ],
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Showcase(
+            key: _scheduleDetailsShowcaseKey,
+            title: 'Choose medication type',
+            description:
+                'Add medicines one by one. Each medicine will be saved separately under this schedule.',
+            child: _buildSectionCard(child: _buildMedicationSetGroup()),
           ),
-        );
-      case 1:
-        return SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Showcase(
-                key: _scheduleDoseShowcaseKey,
-                title: 'Dose amount',
-                description:
-                    'Enter how much of the medicine the user should take each time.',
-                child: _buildInputGroup(
-                  label: 'Dose Amount',
-                  hint: '1 pill..',
-                  controller: _doseAmountController,
-                ),
+          Showcase(
+            key: _scheduleDoseShowcaseKey,
+            title: 'Dose amount',
+            description:
+                'Enter how much of the medicine the user should take each time.',
+            child: _buildSectionCard(
+              child: _buildInputGroup(
+                label: 'Dose Amount',
+                hint: '1 pill..',
+                controller: _doseAmountController,
               ),
-              Showcase(
-                key: _scheduleFrequencyShowcaseKey,
-                title: 'Frequency',
-                description:
-                    'Set how often this medicine should be taken, like daily or every 6 hours.',
-                child: _buildInputGroup(
-                  label: 'Frequency',
-                  hint: 'Daily..',
-                  controller: _frequencyController,
-                ),
-              ),
-              Showcase(
-                key: _scheduleRangeShowcaseKey,
-                title: 'Schedule dates and time',
-                description:
-                    'Choose the date range and reminder time for this medication schedule.',
-                child: _buildReminderRangeGroup(),
-              ),
-              // Notification enable and test UI moved to settings modal
-            ],
+            ),
           ),
-        );
-      default:
-        return const SizedBox.shrink();
-    }
+          Showcase(
+            key: _scheduleFrequencyShowcaseKey,
+            title: 'Frequency',
+            description:
+                'Set how often this medicine should be taken, like daily or every 6 hours.',
+            child: _buildSectionCard(
+              child: _buildInputGroup(
+                label: 'Frequency',
+                hint: 'Daily..',
+                controller: _frequencyController,
+              ),
+            ),
+          ),
+          Showcase(
+            key: _scheduleRangeShowcaseKey,
+            title: 'Schedule dates and time',
+            description:
+                'Choose the date range and reminder time for this medication schedule.',
+            child: _buildSectionCard(child: _buildReminderRangeGroup()),
+          ),
+        ],
+      ),
+    );
   }
 
-  // Notification test card widget removed
+  Widget _buildSectionCard({required Widget child}) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.85),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
 
-  // Notification test logic removed
+  Widget _buildMedicationSetGroup() {
+    final bool hasStocks = _stockMedicineNames.isNotEmpty;
+    final String query = _medicineInputController.text.trim().toLowerCase();
+    final List<String> suggestions = _stockMedicineNames
+        .where((String name) {
+          final bool alreadySelected = _selectedMedicines.any(
+            (String selected) => selected.toLowerCase() == name.toLowerCase(),
+          );
+          if (alreadySelected) {
+            return false;
+          }
+          if (query.isEmpty) {
+            return true;
+          }
+          return name.toLowerCase().contains(query);
+        })
+        .take(6)
+        .toList(growable: false);
 
-  // Widget builder for the standard Input fields (Label + TextField)
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Medicines',
+            style: TextStyle(
+              fontSize: 14,
+              color: textDark,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: inputBgColor,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE6ECE1)),
+                  ),
+                  child: TextField(
+                    controller: _medicineInputController,
+                    textCapitalization: TextCapitalization.words,
+                    autocorrect: true,
+                    enableSuggestions: true,
+                    onChanged: (_) => setState(() {}),
+                    onSubmitted: (_) =>
+                        _addMedicineName(_medicineInputController.text),
+                    decoration: InputDecoration(
+                      hintText: hasStocks
+                          ? 'Type medicine (or choose suggested below)'
+                          : 'Type medicine name',
+                      hintStyle: TextStyle(color: textHint),
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
+                      isDense: true,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: () =>
+                      _addMedicineName(_medicineInputController.text),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: sectionHeaderColor,
+                    foregroundColor: textDark,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Icon(Icons.add),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (_isLoadingStockNames)
+            const SizedBox(
+              height: 20,
+              width: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          else if (suggestions.isNotEmpty)
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: suggestions
+                  .map((String suggestion) {
+                    return ActionChip(
+                      label: Text(
+                        '$suggestion (${_stockCountByMedicine[suggestion] ?? 0} left)',
+                      ),
+                      onPressed: () => _addMedicineName(suggestion),
+                    );
+                  })
+                  .toList(growable: false),
+            )
+          else
+            Text(
+              hasStocks
+                  ? 'No matching suggestions. You can still add a custom medicine name.'
+                  : 'No stocks found. You can still add custom medicine names.',
+              style: TextStyle(fontSize: 12, color: textDark.withOpacity(0.65)),
+            ),
+          const SizedBox(height: 10),
+          if (_selectedMedicines.isEmpty)
+            Text(
+              'Added medicines will appear below. Tap X to remove one.',
+              style: TextStyle(fontSize: 12, color: textDark.withOpacity(0.65)),
+            )
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _selectedMedicines
+                  .map((String medicine) {
+                    return Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6EC),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(color: const Color(0xFFD7E3D2)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            medicine,
+                            style: TextStyle(
+                              color: textDark,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          GestureDetector(
+                            onTap: () => _removeMedicineName(medicine),
+                            child: Icon(
+                              Icons.close,
+                              size: 16,
+                              color: textDark.withOpacity(0.7),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  })
+                  .toList(growable: false),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildInputGroup({
     required String label,
     required String hint,
@@ -404,7 +553,7 @@ class _MedicineModalState extends State<MedicineModal>
             style: TextStyle(
               fontSize: 14,
               color: textDark,
-              fontWeight: FontWeight.w400,
+              fontWeight: FontWeight.w500,
             ),
           ),
           const SizedBox(height: 8),
@@ -412,6 +561,7 @@ class _MedicineModalState extends State<MedicineModal>
             decoration: BoxDecoration(
               color: inputBgColor,
               borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE6ECE1)),
             ),
             child: TextField(
               controller: controller,
@@ -448,7 +598,7 @@ class _MedicineModalState extends State<MedicineModal>
             style: TextStyle(
               fontSize: 14,
               color: textDark,
-              fontWeight: FontWeight.w400,
+              fontWeight: FontWeight.w500,
             ),
           ),
           const SizedBox(height: 8),
@@ -457,6 +607,7 @@ class _MedicineModalState extends State<MedicineModal>
             decoration: BoxDecoration(
               color: inputBgColor,
               borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE6ECE1)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -477,7 +628,7 @@ class _MedicineModalState extends State<MedicineModal>
                             vertical: 8,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF0F0F0),
+                            color: const Color(0xFFF0F4EE),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
@@ -497,7 +648,7 @@ class _MedicineModalState extends State<MedicineModal>
                             vertical: 8,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF0F0F0),
+                            color: const Color(0xFFF0F4EE),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
@@ -518,6 +669,7 @@ class _MedicineModalState extends State<MedicineModal>
             decoration: BoxDecoration(
               color: inputBgColor,
               borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE6ECE1)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -532,7 +684,7 @@ class _MedicineModalState extends State<MedicineModal>
                       vertical: 8,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF0F0F0),
+                      color: const Color(0xFFF0F4EE),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(timeText),
@@ -547,8 +699,15 @@ class _MedicineModalState extends State<MedicineModal>
   }
 
   Future<void> _saveMedicine() async {
-    if (_nameController.text.trim().isEmpty) {
-      _showSnackBar('Select a medication from Stocks first.');
+    if (_selectedMedicines.isEmpty) {
+      final String pendingName = _medicineInputController.text.trim();
+      if (pendingName.isNotEmpty) {
+        _addMedicineName(pendingName);
+      }
+    }
+
+    if (_selectedMedicines.isEmpty) {
+      _showSnackBar('Add at least one medication first.');
       return;
     }
 
@@ -596,26 +755,42 @@ class _MedicineModalState extends State<MedicineModal>
           'Medicine saved, but reminder was not scheduled because the selected time is in the past.';
     }
 
+    final DateTime baseTime = DateTime.now();
+    final List<MedicineRecord> recordsToSave = <MedicineRecord>[];
+    for (int i = 0; i < _selectedMedicines.length; i += 1) {
+      final DateTime createdAt = widget.initialMedicine != null && i == 0
+          ? widget.initialMedicine!.createdAt
+          : baseTime.add(Duration(microseconds: i + 1));
+      recordsToSave.add(
+        MedicineRecord(
+          iconKey: _selectedIconKey,
+          name: _selectedMedicines[i],
+          doseAmount: _doseAmountController.text.trim(),
+          frequency: _frequencyController.text.trim(),
+          specificTime: reminderDateTime,
+          reminderStartDate: _reminderStartDate,
+          reminderEndDate: _reminderEndDate,
+          createdAt: createdAt,
+        ),
+      );
+    }
+
     setState(() {
       _isSaving = true;
     });
 
-    final MedicineRecord record = MedicineRecord(
-      iconKey: _selectedIconKey,
-      name: _nameController.text.trim(),
-      doseAmount: _doseAmountController.text.trim(),
-      frequency: _frequencyController.text.trim(),
-      specificTime: reminderDateTime,
-      reminderStartDate: _reminderStartDate,
-      reminderEndDate: _reminderEndDate,
-      createdAt: widget.initialMedicine?.createdAt ?? DateTime.now(),
-    );
-
     try {
       if (widget.initialMedicine == null) {
-        await MedicineStorage.addMedicine(record);
+        for (final MedicineRecord record in recordsToSave) {
+          await MedicineStorage.addMedicine(record);
+        }
       } else {
-        await MedicineStorage.updateMedicine(record);
+        await MedicineStorage.updateMedicine(recordsToSave.first);
+        if (recordsToSave.length > 1) {
+          for (final MedicineRecord record in recordsToSave.skip(1)) {
+            await MedicineStorage.addMedicine(record);
+          }
+        }
       }
     } catch (_) {
       if (mounted) {
@@ -635,19 +810,23 @@ class _MedicineModalState extends State<MedicineModal>
           postSaveMessage =
               'Medicine saved, but notifications are disabled in system settings.';
         } else {
-          final int scheduledCount =
-              await NotificationService.scheduleMedicineReminderRange(
-                medicineCreatedAtMillis:
-                    record.createdAt.millisecondsSinceEpoch,
-                medicineName: record.name,
-                startDate: _reminderStartDate!,
-                endDate: _reminderEndDate!,
-                hour: _reminderTime!.hour,
-                minute: _reminderTime!.minute,
-                doseAmount: record.doseAmount,
-              );
+          int totalScheduledCount = 0;
+          for (final MedicineRecord record in recordsToSave) {
+            final int scheduledCount =
+                await NotificationService.scheduleMedicineReminderRange(
+                  medicineCreatedAtMillis:
+                      record.createdAt.millisecondsSinceEpoch,
+                  medicineName: record.name,
+                  startDate: _reminderStartDate!,
+                  endDate: _reminderEndDate!,
+                  hour: _reminderTime!.hour,
+                  minute: _reminderTime!.minute,
+                  doseAmount: record.doseAmount,
+                );
+            totalScheduledCount += scheduledCount;
+          }
 
-          if (scheduledCount == 0) {
+          if (totalScheduledCount == 0) {
             postSaveMessage =
                 'Medicine saved, but no reminders were scheduled because all selected dates are in the past.';
           }
@@ -664,12 +843,14 @@ class _MedicineModalState extends State<MedicineModal>
           postSaveMessage =
               'Medicine saved, but notifications are disabled in system settings.';
         } else {
-          await NotificationService.scheduleMedicineReminder(
-            medicineCreatedAtMillis: record.createdAt.millisecondsSinceEpoch,
-            medicineName: record.name,
-            scheduledAt: reminderDateTime,
-            doseAmount: record.doseAmount,
-          );
+          for (final MedicineRecord record in recordsToSave) {
+            await NotificationService.scheduleMedicineReminder(
+              medicineCreatedAtMillis: record.createdAt.millisecondsSinceEpoch,
+              medicineName: record.name,
+              scheduledAt: reminderDateTime,
+              doseAmount: record.doseAmount,
+            );
+          }
         }
       } catch (_) {
         postSaveMessage =
@@ -692,9 +873,8 @@ class _MedicineModalState extends State<MedicineModal>
 
   void _clearForm() {
     setState(() {
-      _nameController.text = _stockMedicineNames.isNotEmpty
-          ? _stockMedicineNames.first
-          : '';
+      _medicineInputController.clear();
+      _selectedMedicines = <String>[];
       _doseAmountController.clear();
       _frequencyController.clear();
       _reminderStartDate = null;
@@ -704,51 +884,32 @@ class _MedicineModalState extends State<MedicineModal>
     });
   }
 
-  Future<void> _showIconPicker() async {
-    final String? selected = await showModalBottomSheet<String>(
-      context: context,
-      showDragHandle: true,
-      builder: (BuildContext context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Choose medicine icon',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: MedicineIcons.options.map((
-                    MedicineIconOption option,
-                  ) {
-                    final bool isSelected = option.key == _selectedIconKey;
-                    return ChoiceChip(
-                      label: Text(option.label),
-                      avatar: Icon(option.icon, size: 18),
-                      selected: isSelected,
-                      onSelected: (_) => Navigator.pop(context, option.key),
-                    );
-                  }).toList(),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
+  void _addMedicineName(String value) {
+    final String name = value.trim();
+    if (name.isEmpty) {
+      return;
+    }
 
-    if (selected == null) {
+    final bool exists = _selectedMedicines.any(
+      (String item) => item.toLowerCase() == name.toLowerCase(),
+    );
+    if (exists) {
+      _medicineInputController.clear();
+      setState(() {});
       return;
     }
 
     setState(() {
-      _selectedIconKey = selected;
+      _selectedMedicines = <String>[..._selectedMedicines, name];
+      _medicineInputController.clear();
+    });
+  }
+
+  void _removeMedicineName(String name) {
+    setState(() {
+      _selectedMedicines = _selectedMedicines
+          .where((String item) => item != name)
+          .toList(growable: false);
     });
   }
 
@@ -841,7 +1002,6 @@ class _MedicineModalState extends State<MedicineModal>
   }
 
   void _goToTab(int index) {
-    _tabController.animateTo(index);
     setState(() {
       _currentTabIndex = index;
     });
@@ -878,11 +1038,11 @@ class _MedicineModalState extends State<MedicineModal>
     }
 
     final List<String> stockNames = stockCountByMedicine.keys.toList()..sort();
-    final String initialName = _nameController.text.trim();
-    if (initialName.isNotEmpty && !stockNames.contains(initialName)) {
-      stockNames.insert(0, initialName);
-      stockCountByMedicine[initialName] =
-          stockCountByMedicine[initialName] ?? 0;
+    for (final String selected in _selectedMedicines) {
+      if (!stockNames.contains(selected)) {
+        stockNames.insert(0, selected);
+        stockCountByMedicine[selected] = stockCountByMedicine[selected] ?? 0;
+      }
     }
 
     if (!mounted) {
@@ -893,93 +1053,7 @@ class _MedicineModalState extends State<MedicineModal>
       _stockMedicineNames = stockNames;
       _stockCountByMedicine = stockCountByMedicine;
       _isLoadingStockNames = false;
-      if (_nameController.text.trim().isEmpty && stockNames.isNotEmpty) {
-        _nameController.text = stockNames.first;
-      }
     });
-  }
-
-  Widget _buildMedicationDropdownGroup() {
-    final String selectedName = _nameController.text.trim();
-    final bool hasStocks = _stockMedicineNames.isNotEmpty;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Medication name',
-            style: TextStyle(
-              fontSize: 14,
-              color: textDark,
-              fontWeight: FontWeight.w400,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Container(
-            decoration: BoxDecoration(
-              color: inputBgColor,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: _isLoadingStockNames
-                ? const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    child: SizedBox(
-                      height: 18,
-                      width: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  )
-                : hasStocks
-                ? DropdownButtonFormField<String>(
-                    initialValue: selectedName.isNotEmpty ? selectedName : null,
-                    isExpanded: true,
-                    items: _stockMedicineNames
-                        .map(
-                          (String name) => DropdownMenuItem<String>(
-                            value: name,
-                            child: Text(
-                              '$name (${_stockCountByMedicine[name] ?? 0} left)',
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (String? value) {
-                      if (value == null) {
-                        return;
-                      }
-                      setState(() {
-                        _nameController.text = value;
-                      });
-                    },
-                    decoration: InputDecoration(
-                      hintText: 'Select medication',
-                      hintStyle: TextStyle(color: textHint),
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 14,
-                      ),
-                      isDense: true,
-                    ),
-                    icon: const Icon(Icons.keyboard_arrow_down_rounded),
-                  )
-                : Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 14,
-                    ),
-                    child: Text(
-                      'No stocks found. Add medication in Stocks page.',
-                      style: TextStyle(color: textHint),
-                    ),
-                  ),
-          ),
-        ],
-      ),
-    );
   }
 
   void _populateInitialValues() {
@@ -989,7 +1063,7 @@ class _MedicineModalState extends State<MedicineModal>
     }
 
     _selectedIconKey = initial.iconKey;
-    _nameController.text = initial.name;
+    _selectedMedicines = <String>[initial.name];
     _doseAmountController.text = initial.doseAmount;
     _frequencyController.text = initial.frequency;
 
