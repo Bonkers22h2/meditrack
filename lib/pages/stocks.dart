@@ -195,29 +195,12 @@ class _StockScreenState extends State<StockScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      IconButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        icon: Icon(
-                          Icons.arrow_back_ios_new_rounded,
-                          color: textDark,
-                          size: 20,
-                        ),
-                        tooltip: 'Back to dashboard',
-                        splashRadius: 20,
-                      ),
-                      Icon(Icons.wb_sunny_outlined, color: textFaint, size: 22),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Meditrack',
-                        style: TextStyle(
-                          color: textFaint,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
+                  SizedBox(
+                    height: 40,
+                    child: Image.asset(
+                      'android/app/src/main/res/assets/icons (1).png',
+                      fit: BoxFit.contain,
+                    ),
                   ),
                   Row(
                     children: [

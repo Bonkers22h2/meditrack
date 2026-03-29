@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:meditrack/modals/medicine_details_modal.dart';
 import 'package:meditrack/modals/medicine_modal.dart';
+import 'package:meditrack/pages/reports.dart';
 import 'package:meditrack/pages/stocks.dart';
 import 'package:meditrack/modals/settings_modal.dart';
 import 'package:meditrack/tutorials/dashboard_tutorial.dart';
@@ -370,195 +371,197 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: backgroundColor,
-      body: SafeArea(
-        child: _selectedTabIndex == 0
-            ? Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+    final Widget currentTab = _selectedTabIndex == 0
+        ? Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 12),
+                // 1. Top Bar (Logo + Settings)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const SizedBox(height: 12),
-                    // 1. Top Bar (Logo + Settings)
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Align(
-                            alignment: Alignment.centerLeft,
-                            child: Padding(
-                              padding: const EdgeInsets.only(left: 8),
-                              child: SizedBox(
-                                height: 40,
-                                child: Image.asset(
-                                  'android/app/src/main/res/assets/icons (1).png',
-                                  fit: BoxFit.contain,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        Row(
-                          children: [
-                            Container(
-                              width: 48,
-                              height: 48,
-                              decoration: BoxDecoration(
-                                color: cardColor,
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.03),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
-                              ),
-                              child: IconButton(
-                                tooltip: 'Help Center',
-                                icon: Icon(
-                                  Icons.help_outline,
-                                  color: textLight,
-                                  size: 24,
-                                ),
-                                onPressed: _openHelpSectionsPopup,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Container(
-                              width: 48,
-                              height: 48,
-                              decoration: BoxDecoration(
-                                color: cardColor,
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.03),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
-                              ),
-                              child: IconButton(
-                                icon: Icon(
-                                  Icons.settings_outlined,
-                                  color: textLight,
-                                  size: 24,
-                                ),
-                                onPressed: () {
-                                  showModalBottomSheet(
-                                    context: context,
-                                    isScrollControlled: true,
-                                    useSafeArea: true,
-                                    backgroundColor: Colors.transparent,
-                                    builder: (BuildContext context) =>
-                                        const SettingsModal(),
-                                  );
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 22),
-                    // 2. Title and Schedule Medication button
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Expanded(
-                          child: Showcase(
-                            key: _titleShowcaseKey,
-                            title: 'Reminders dashboard overview',
-                            description:
-                                'This is the reminders dashboard where you can review today\'s medication list.',
-                            child: Text(
-                              'Reminders',
-                              style: TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.w600,
-                                color: textDark,
-                                letterSpacing: -0.5,
-                              ),
-                            ),
-                          ),
-                        ),
-                        Showcase(
-                          key: _scheduleButtonShowcaseKey,
-                          title: 'Schedule medication',
-                          description:
-                              'Use this button to add a new medication reminder.',
-                          child: ElevatedButton.icon(
-                            onPressed: _openMedicineModal,
-                            icon: const Icon(Icons.add, color: Colors.white),
-                            label: const Text(
-                              'Schedule Medication',
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: 0.1,
-                              ),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: textDark,
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 14,
-                                horizontal: 18,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(18),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    // Date selector row
-                    Showcase(
-                      key: _dateSelectorShowcaseKey,
-                      title: 'Pick a day',
-                      description:
-                          'Switch between dates to review reminders for any day of the week.',
-                      child: _buildDateSelector(),
-                    ),
-                    const SizedBox(height: 14),
-                    Row(
-                      children: [
-                        Text(
-                          '$_stockCount stock item${_stockCount == 1 ? '' : 's'} tracked',
-                          style: TextStyle(
-                            color: textFaint,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(width: 18),
-                        Text(
-                          '${_medicines.length} reminder${_medicines.length == 1 ? '' : 's'} saved',
-                          style: TextStyle(
-                            color: textFaint,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
                     Expanded(
-                      child: _isLoading
-                          ? const Center(child: CircularProgressIndicator())
-                          : _buildRemindersForSelectedDate(),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Padding(
+                          padding: const EdgeInsets.only(left: 8),
+                          child: SizedBox(
+                            height: 40,
+                            child: Image.asset(
+                              'android/app/src/main/res/assets/icons (1).png',
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
-                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: cardColor,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.03),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: IconButton(
+                            tooltip: 'Help Center',
+                            icon: Icon(
+                              Icons.help_outline,
+                              color: textLight,
+                              size: 24,
+                            ),
+                            onPressed: _openHelpSectionsPopup,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: cardColor,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.03),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: IconButton(
+                            icon: Icon(
+                              Icons.settings_outlined,
+                              color: textLight,
+                              size: 24,
+                            ),
+                            onPressed: () {
+                              showModalBottomSheet(
+                                context: context,
+                                isScrollControlled: true,
+                                useSafeArea: true,
+                                backgroundColor: Colors.transparent,
+                                builder: (BuildContext context) =>
+                                    const SettingsModal(),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
-              )
-            : const StockScreen(),
-      ),
+                const SizedBox(height: 22),
+                // 2. Title and Schedule Medication button
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Showcase(
+                        key: _titleShowcaseKey,
+                        title: 'Reminders dashboard overview',
+                        description:
+                            'This is the reminders dashboard where you can review today\'s medication list.',
+                        child: Text(
+                          'Reminders',
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w600,
+                            color: textDark,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Showcase(
+                      key: _scheduleButtonShowcaseKey,
+                      title: 'Schedule medication',
+                      description:
+                          'Use this button to add a new medication reminder.',
+                      child: ElevatedButton.icon(
+                        onPressed: _openMedicineModal,
+                        icon: const Icon(Icons.add, color: Colors.white),
+                        label: const Text(
+                          'Schedule Medication',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.1,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: textDark,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 14,
+                            horizontal: 18,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                // Date selector row
+                Showcase(
+                  key: _dateSelectorShowcaseKey,
+                  title: 'Pick a day',
+                  description:
+                      'Switch between dates to review reminders for any day of the week.',
+                  child: _buildDateSelector(),
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Text(
+                      '$_stockCount stock item${_stockCount == 1 ? '' : 's'} tracked',
+                      style: TextStyle(
+                        color: textFaint,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: 18),
+                    Text(
+                      '${_medicines.length} reminder${_medicines.length == 1 ? '' : 's'} saved',
+                      style: TextStyle(
+                        color: textFaint,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: _isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : _buildRemindersForSelectedDate(),
+                ),
+                const SizedBox(height: 4),
+              ],
+            ),
+          )
+        : _selectedTabIndex == 1
+        ? const StockScreen()
+        : const ReportsScreen();
+
+    return Scaffold(
+      backgroundColor: backgroundColor,
+      body: SafeArea(child: currentTab),
       bottomNavigationBar: Showcase(
         key: _stockTabShowcaseKey,
         title: 'Open stocks',
@@ -583,6 +586,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             BottomNavigationBarItem(
               icon: Icon(Icons.inventory_2_outlined),
               label: 'Stocks',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.insert_chart_outlined),
+              label: 'Reports',
             ),
           ],
         ),
