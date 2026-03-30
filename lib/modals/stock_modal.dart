@@ -1,4 +1,4 @@
-// modals/stock_modal.dart
+// lib/modals/stock_modal.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:meditrack/services/medicine_icons.dart';
@@ -39,13 +39,16 @@ class _StockEditModalState extends State<StockEditModal> {
   final Color labelColor = const Color(0xFF9E9E9E);
   final Color saveBtnBgColor = const Color(0xFFEFEFE8);
 
-  // Dynamic Progress Colors
+  // Dynamic Progress Colors (Synced with Dashboard)
   final Color progressInactiveColor = const Color(0xFFE0E0E0);
-  final Color progressRedColor = const Color(0xFFFF6B6B); // Critical (<25%)
+  final Color progressRedColor = const Color(0xFFFFC4CD); // Low Stock (Red)
   final Color progressYellowColor = const Color(
-    0xFFFFD654,
-  ); // Warning (25%-50%)
-  final Color progressGreenColor = const Color(0xFFAED581); // High (>50%)
+    0xFFFFF1BD,
+  ); // Refill Soon (Yellow)
+  final Color progressGreenColor = const Color(0xFFC0E5C4); // In Stock (Green)
+  final Color progressExpiredColor = const Color(
+    0xFFFF6B6B,
+  ); // Strong Red (Expired)
 
   @override
   void initState() {
@@ -150,14 +153,12 @@ class _StockEditModalState extends State<StockEditModal> {
   }
 
   String _formatDate(DateTime? date) {
-    if (date == null) {
-      return 'Select date';
-    }
+    if (date == null) return 'Select date';
     return '${_monthName(date.month)} ${date.day}, ${date.year}';
   }
 
   String _monthName(int month) {
-    const List<String> months = <String>[
+    const List<String> months = [
       'January',
       'February',
       'March',
@@ -194,9 +195,7 @@ class _StockEditModalState extends State<StockEditModal> {
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
-                  children: MedicineIcons.options.map((
-                    MedicineIconOption option,
-                  ) {
+                  children: MedicineIcons.options.map((option) {
                     final bool isSelected = option.key == _selectedIconKey;
                     return ChoiceChip(
                       label: Text(option.label),
@@ -213,19 +212,15 @@ class _StockEditModalState extends State<StockEditModal> {
       },
     );
 
-    if (selected == null) {
-      return;
+    if (selected != null) {
+      setState(() {
+        _selectedIconKey = selected;
+      });
     }
-
-    setState(() {
-      _selectedIconKey = selected;
-    });
   }
 
   String? _expiringLabel() {
-    if (_selectedExpiryDate == null) {
-      return null;
-    }
+    if (_selectedExpiryDate == null) return null;
 
     final DateTime today = DateTime.now();
     final DateTime normalizedToday = DateTime(
@@ -240,30 +235,28 @@ class _StockEditModalState extends State<StockEditModal> {
     );
     final int days = normalizedExpiry.difference(normalizedToday).inDays;
 
-    if (days < 0) {
-      return 'Already expired';
-    }
-
+    if (days < 0) return 'Already expired';
     return 'Expires in $days day${days == 1 ? '' : 's'}';
   }
 
+  // --- SYNCED COLOR LOGIC ---
   Color _getProgressColor() {
-    final int lowThreshold = int.tryParse(_lowStockController.text) ?? 4;
+    // 1. Check Expiration first
+    if (_selectedExpiryDate != null &&
+        _selectedExpiryDate!.isBefore(DateTime.now())) {
+      return progressExpiredColor;
+    }
 
-    // Calculate percentage relative to the visual "full" cap (Threshold * 2)
-    final double safeThreshold = lowThreshold <= 0
-        ? 1
-        : lowThreshold.toDouble();
-    final double maxDisplayValue = safeThreshold * 2;
-    final double percentRemaining = _currentStock / maxDisplayValue;
+    // 2. Parse the current threshold from the controller
+    final int lowThreshold = int.tryParse(_lowStockController.text) ?? 0;
 
-    // ✅ UPDATED LOGIC: Based on exact percentage thresholds
-    if (percentRemaining > 0.50) {
-      return progressGreenColor; // Green: > 50%
-    } else if (percentRemaining > 0.25 && percentRemaining <= 0.50) {
-      return progressYellowColor; // Yellow: 25% - 50%
+    // 3. Apply the synced rules
+    if (_currentStock <= lowThreshold) {
+      return progressRedColor;
+    } else if (_currentStock <= lowThreshold + 3) {
+      return progressYellowColor;
     } else {
-      return progressRedColor; // Red: < 25%
+      return progressGreenColor;
     }
   }
 
@@ -288,14 +281,12 @@ class _StockEditModalState extends State<StockEditModal> {
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
           child: Column(
-            mainAxisSize: MainAxisSize.min, // Shrinks to fit content
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // 1. Close Button & Image Placeholder
               Stack(
                 alignment: Alignment.topCenter,
                 children: [
-                  // Image Circle
                   GestureDetector(
                     onTap: _showIconPicker,
                     child: Container(
@@ -312,7 +303,6 @@ class _StockEditModalState extends State<StockEditModal> {
                       ),
                     ),
                   ),
-                  // Close Button (Top Right)
                   Align(
                     alignment: Alignment.topRight,
                     child: IconButton(
@@ -334,10 +324,7 @@ class _StockEditModalState extends State<StockEditModal> {
                 icon: const Icon(Icons.edit_outlined, size: 18),
                 label: const Text('Edit icon'),
               ),
-
               const SizedBox(height: 20),
-
-              // 2. Editable medicine name
               TextField(
                 controller: _medicineNameController,
                 autofocus: false,
@@ -358,8 +345,6 @@ class _StockEditModalState extends State<StockEditModal> {
                   letterSpacing: -0.5,
                 ),
               ),
-
-              // 3. Doses Left (Monospace)
               Text(
                 '$_currentStock doses left',
                 style: const TextStyle(
@@ -368,10 +353,7 @@ class _StockEditModalState extends State<StockEditModal> {
                   color: Color(0xFF8C8C8C),
                 ),
               ),
-
               const SizedBox(height: 16),
-
-              // 4. Progress Bar (With Dynamic Color)
               Container(
                 height: 12,
                 width: double.infinity,
@@ -384,16 +366,13 @@ class _StockEditModalState extends State<StockEditModal> {
                   widthFactor: _progressFactor(lowThreshold),
                   child: Container(
                     decoration: BoxDecoration(
-                      color: _getProgressColor(), // ✅ Use dynamic color
+                      color: _getProgressColor(),
                       borderRadius: BorderRadius.circular(6),
                     ),
                   ),
                 ),
               ),
-
               const SizedBox(height: 24),
-
-              // 5. Details Form Fields
               _buildDetailInputRow(
                 label: 'Low Stock:',
                 controller: _lowStockController,
@@ -401,8 +380,6 @@ class _StockEditModalState extends State<StockEditModal> {
               ),
               const SizedBox(height: 12),
               _buildDateRow(),
-
-              // Expiry Warning Label
               if (expiryText != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 8.0, left: 90),
@@ -426,10 +403,7 @@ class _StockEditModalState extends State<StockEditModal> {
                     ],
                   ),
                 ),
-
               const SizedBox(height: 24),
-
-              // 6. Current Stock Section
               Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
@@ -441,8 +415,6 @@ class _StockEditModalState extends State<StockEditModal> {
                   ),
                 ),
               ),
-
-              // Stepper Control (+ / -)
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -465,11 +437,11 @@ class _StockEditModalState extends State<StockEditModal> {
                           autofocus: false,
                           keyboardType: TextInputType.number,
                           textInputAction: TextInputAction.done,
-                          inputFormatters: <TextInputFormatter>[
+                          inputFormatters: [
                             FilteringTextInputFormatter.digitsOnly,
                           ],
                           textAlign: TextAlign.center,
-                          onChanged: (String value) {
+                          onChanged: (value) {
                             final int? parsed = int.tryParse(value);
                             setState(() {
                               _currentStock = parsed ?? 0;
@@ -502,10 +474,7 @@ class _StockEditModalState extends State<StockEditModal> {
                   ),
                 ],
               ),
-
               const SizedBox(height: 24),
-
-              // 7. Save Button
               SizedBox(
                 width: double.infinity,
                 height: 56,
@@ -574,6 +543,8 @@ class _StockEditModalState extends State<StockEditModal> {
               controller: controller,
               autofocus: false,
               keyboardType: keyboardType,
+              // Live Color Sync:
+              onChanged: (_) => setState(() {}),
               decoration: const InputDecoration(border: InputBorder.none),
               textAlign: TextAlign.center,
               style: TextStyle(

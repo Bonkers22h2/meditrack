@@ -1,4 +1,4 @@
-// pages/stocks.dart
+// lib/pages/stocks.dart
 import 'package:flutter/material.dart';
 import 'package:meditrack/modals/stock_modal.dart';
 import 'package:meditrack/services/stock_storage.dart';
@@ -30,9 +30,11 @@ class _StockScreenState extends State<StockScreen> {
   final Color textFaint = const Color(0xFF8B9084);
   final Color textSection = const Color(0xFFA1A69B);
 
-  final Color lowStockColor = const Color(0xFFFFC4CD);
-  final Color refillSoonColor = const Color(0xFFFFF1BD);
-  final Color inStockColor = const Color(0xFFC0E5C4);
+  // Synchronized color constants
+  final Color lowStockColor = const Color(0xFFFFC4CD); // Red
+  final Color refillSoonColor = const Color(0xFFFFF1BD); // Yellow
+  final Color inStockColor = const Color(0xFFC0E5C4); // Green
+  final Color expiredColor = const Color(0xFFFF6B6B); // Strong Red
 
   @override
   void initState() {
@@ -56,14 +58,21 @@ class _StockScreenState extends State<StockScreen> {
 
   Future<void> _loadStocks() async {
     final List<StockRecord> records = await StockStorage.loadStocks();
-    if (!mounted) {
-      return;
-    }
+    if (!mounted) return;
 
     setState(() {
       _stocks = records.reversed.toList();
       _isLoading = false;
     });
+  }
+
+  // --- SYNC HELPER METHOD ---
+  // This ensures the dashboard always matches the dialog logic
+  Color _getStockCardColor(StockRecord stock) {
+    if (stock.isExpired) return expiredColor;
+    if (stock.isLowStock) return lowStockColor;
+    if (stock.isRefillSoon) return refillSoonColor;
+    return inStockColor;
   }
 
   Future<void> _openAddStockModal() async {
@@ -72,9 +81,7 @@ class _StockScreenState extends State<StockScreen> {
       builder: (BuildContext context) => const StockEditModal(),
     );
 
-    if (newStock == null) {
-      return;
-    }
+    if (newStock == null) return;
 
     await StockStorage.addStock(newStock);
     await _loadStocks();
@@ -86,9 +93,7 @@ class _StockScreenState extends State<StockScreen> {
       builder: (BuildContext context) => StockEditModal(initialRecord: record),
     );
 
-    if (updatedStock == null) {
-      return;
-    }
+    if (updatedStock == null) return;
 
     await StockStorage.upsertStock(updatedStock);
     await _loadStocks();
@@ -134,19 +139,16 @@ class _StockScreenState extends State<StockScreen> {
     }
 
     final List<StockRecord> expired = _stocks
-        .where((StockRecord stock) => stock.isExpired)
+        .where((s) => s.isExpired)
         .toList();
     final List<StockRecord> lowStock = _stocks
-        .where((StockRecord stock) => stock.isLowStock && !stock.isExpired)
+        .where((s) => s.isLowStock && !s.isExpired)
         .toList();
     final List<StockRecord> refillSoon = _stocks
-        .where((StockRecord stock) => stock.isRefillSoon && !stock.isExpired)
+        .where((s) => s.isRefillSoon && !s.isExpired)
         .toList();
     final List<StockRecord> inStock = _stocks
-        .where(
-          (StockRecord stock) =>
-              !stock.isLowStock && !stock.isRefillSoon && !stock.isExpired,
-        )
+        .where((s) => !s.isLowStock && !s.isRefillSoon && !s.isExpired)
         .toList();
 
     return Column(
@@ -154,41 +156,24 @@ class _StockScreenState extends State<StockScreen> {
       children: [
         if (expired.isNotEmpty) ...[
           _buildSectionTitle('Expired'),
-          ...expired.map(
-            (StockRecord stock) => _buildMedicineCard(
-              stock: stock,
-              doses: _dosesText(stock.currentStock),
-              bgColor: const Color(0xFFFF6B6B),
-            ),
-          ),
+          ...expired.map((stock) => _buildMedicineCard(stock: stock)),
           const SizedBox(height: 8),
         ],
-        _buildSectionTitle('Low Stock'),
-        ...lowStock.map(
-          (StockRecord stock) => _buildMedicineCard(
-            stock: stock,
-            doses: _dosesText(stock.currentStock),
-            bgColor: lowStockColor,
-          ),
-        ),
-        const SizedBox(height: 8),
-        _buildSectionTitle('Refill Soon'),
-        ...refillSoon.map(
-          (StockRecord stock) => _buildMedicineCard(
-            stock: stock,
-            doses: _dosesText(stock.currentStock),
-            bgColor: refillSoonColor,
-          ),
-        ),
-        const SizedBox(height: 8),
-        _buildSectionTitle('In Stock'),
-        ...inStock.map(
-          (StockRecord stock) => _buildMedicineCard(
-            stock: stock,
-            doses: _dosesText(stock.currentStock),
-            bgColor: inStockColor,
-          ),
-        ),
+        if (lowStock.isNotEmpty) ...[
+          _buildSectionTitle('Low Stock'),
+          ...lowStock.map((stock) => _buildMedicineCard(stock: stock)),
+          const SizedBox(height: 8),
+        ],
+        if (refillSoon.isNotEmpty) ...[
+          _buildSectionTitle('Refill Soon'),
+          ...refillSoon.map((stock) => _buildMedicineCard(stock: stock)),
+          const SizedBox(height: 8),
+        ],
+        if (inStock.isNotEmpty) ...[
+          _buildSectionTitle('In Stock'),
+          ...inStock.map((stock) => _buildMedicineCard(stock: stock)),
+          const SizedBox(height: 8),
+        ],
       ],
     );
   }
@@ -204,7 +189,6 @@ class _StockScreenState extends State<StockScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 16),
-
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -269,9 +253,7 @@ class _StockScreenState extends State<StockScreen> {
                   ),
                 ],
               ),
-
               const SizedBox(height: 32),
-
               Showcase(
                 key: _titleShowcaseKey,
                 title: 'Stock management',
@@ -287,9 +269,7 @@ class _StockScreenState extends State<StockScreen> {
                   ),
                 ),
               ),
-
               const SizedBox(height: 16),
-
               Showcase(
                 key: _addMedicationShowcaseKey,
                 title: 'Add medication stock',
@@ -319,9 +299,7 @@ class _StockScreenState extends State<StockScreen> {
                   ),
                 ),
               ),
-
               const SizedBox(height: 8),
-
               Showcase(
                 key: _stockListShowcaseKey,
                 title: 'Track inventory',
@@ -329,9 +307,7 @@ class _StockScreenState extends State<StockScreen> {
                     'Low stock, refill soon, expired, and in-stock items are grouped so you can prioritize what needs attention.',
                 child: _buildStockListBySection(),
               ),
-
               const SizedBox(height: 24),
-
               Showcase(
                 key: _reportShowcaseKey,
                 title: 'View reports',
@@ -356,9 +332,7 @@ class _StockScreenState extends State<StockScreen> {
                       color: Colors.transparent,
                       child: InkWell(
                         borderRadius: BorderRadius.circular(8),
-                        onTap: () {
-                          // View report logic
-                        },
+                        onTap: () {},
                         child: Padding(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 16.0,
@@ -378,7 +352,6 @@ class _StockScreenState extends State<StockScreen> {
                   ),
                 ),
               ),
-
               const SizedBox(height: 40),
             ],
           ),
@@ -401,16 +374,15 @@ class _StockScreenState extends State<StockScreen> {
     );
   }
 
-  Widget _buildMedicineCard({
-    required StockRecord stock,
-    required String doses,
-    required Color bgColor,
-  }) {
+  Widget _buildMedicineCard({required StockRecord stock}) {
     final bool showWarning = stock.isExpired || stock.isExpiringSoon;
     final IconData warningIcon = stock.isExpired
         ? Icons.error_rounded
         : Icons.warning_amber_rounded;
     final String warningLabel = stock.isExpired ? 'Expired' : 'Expiring';
+
+    // Logic Sync: Card determines its own color via helper
+    final Color cardBgColor = _getStockCardColor(stock);
 
     return Material(
       color: Colors.transparent,
@@ -421,7 +393,7 @@ class _StockScreenState extends State<StockScreen> {
           margin: const EdgeInsets.only(bottom: 12.0),
           padding: const EdgeInsets.fromLTRB(20, 16, 24, 16),
           decoration: BoxDecoration(
-            color: stock.isExpired ? const Color(0xFFFF6B6B) : bgColor,
+            color: cardBgColor,
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
@@ -441,7 +413,7 @@ class _StockScreenState extends State<StockScreen> {
                     Icon(warningIcon, color: Colors.white, size: 20),
                     Text(
                       warningLabel,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 8,
                         color: Colors.white,
                         fontWeight: FontWeight.w600,
@@ -451,7 +423,6 @@ class _StockScreenState extends State<StockScreen> {
                 ),
                 const SizedBox(width: 12),
               ],
-
               Text(
                 stock.medicineName,
                 style: TextStyle(
@@ -460,29 +431,29 @@ class _StockScreenState extends State<StockScreen> {
                   color: stock.isExpired ? Colors.white : textDark,
                 ),
               ),
-
               const SizedBox(width: 16),
-
               Text(
-                doses,
+                _dosesText(stock.currentStock),
                 style: const TextStyle(
                   fontFamily: 'monospace',
                   color: Color(0xFF8C8C8C),
                   fontSize: 13,
                 ),
               ),
-
               const Spacer(),
-
               Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.edit, size: 24, color: textDark),
+                  Icon(
+                    Icons.edit,
+                    size: 24,
+                    color: stock.isExpired ? Colors.white : textDark,
+                  ),
                   Text(
                     'Edit',
                     style: TextStyle(
                       fontSize: 10,
-                      color: textDark,
+                      color: stock.isExpired ? Colors.white : textDark,
                       fontWeight: FontWeight.w500,
                       letterSpacing: 0.5,
                     ),
