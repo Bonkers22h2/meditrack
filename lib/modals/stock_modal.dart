@@ -1,3 +1,4 @@
+// modals/stock_modal.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:meditrack/services/medicine_icons.dart';
@@ -34,11 +35,17 @@ class _StockEditModalState extends State<StockEditModal> {
   // Colors based on the provided design
   final Color modalBgColor = const Color(0xFFF7F7F4);
   final Color circlePlaceholderColor = const Color(0xFFD9D9D9);
-  final Color progressActiveColor = const Color(0xFFF8B600);
-  final Color progressInactiveColor = const Color(0xFFE0E0E0);
-  final Color labelColor = const Color(0xFF9E9E9E);
   final Color textDark = const Color(0xFF1A1A1A);
+  final Color labelColor = const Color(0xFF9E9E9E);
   final Color saveBtnBgColor = const Color(0xFFEFEFE8);
+
+  // Dynamic Progress Colors
+  final Color progressInactiveColor = const Color(0xFFE0E0E0);
+  final Color progressRedColor = const Color(0xFFFF6B6B); // Critical (<25%)
+  final Color progressYellowColor = const Color(
+    0xFFFFD654,
+  ); // Warning (25%-50%)
+  final Color progressGreenColor = const Color(0xFFAED581); // High (>50%)
 
   @override
   void initState() {
@@ -240,6 +247,26 @@ class _StockEditModalState extends State<StockEditModal> {
     return 'Expires in $days day${days == 1 ? '' : 's'}';
   }
 
+  Color _getProgressColor() {
+    final int lowThreshold = int.tryParse(_lowStockController.text) ?? 4;
+
+    // Calculate percentage relative to the visual "full" cap (Threshold * 2)
+    final double safeThreshold = lowThreshold <= 0
+        ? 1
+        : lowThreshold.toDouble();
+    final double maxDisplayValue = safeThreshold * 2;
+    final double percentRemaining = _currentStock / maxDisplayValue;
+
+    // ✅ UPDATED LOGIC: Based on exact percentage thresholds
+    if (percentRemaining > 0.50) {
+      return progressGreenColor; // Green: > 50%
+    } else if (percentRemaining > 0.25 && percentRemaining <= 0.50) {
+      return progressYellowColor; // Yellow: 25% - 50%
+    } else {
+      return progressRedColor; // Red: < 25%
+    }
+  }
+
   double _progressFactor(int lowStockThreshold) {
     final int safeThreshold = lowStockThreshold <= 0 ? 1 : lowStockThreshold;
     final double value = _currentStock / (safeThreshold * 2);
@@ -255,245 +282,255 @@ class _StockEditModalState extends State<StockEditModal> {
       backgroundColor: modalBgColor,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min, // Shrinks to fit content
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // 1. Close Button & Image Placeholder
-            Stack(
-              alignment: Alignment.topCenter,
-              children: [
-                // Image Circle
-                GestureDetector(
-                  onTap: _showIconPicker,
-                  child: Container(
-                    width: 150,
-                    height: 150,
-                    decoration: BoxDecoration(
-                      color: circlePlaceholderColor,
-                      shape: BoxShape.circle,
+      child: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        behavior: HitTestBehavior.opaque,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min, // Shrinks to fit content
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // 1. Close Button & Image Placeholder
+              Stack(
+                alignment: Alignment.topCenter,
+                children: [
+                  // Image Circle
+                  GestureDetector(
+                    onTap: _showIconPicker,
+                    child: Container(
+                      width: 150,
+                      height: 150,
+                      decoration: BoxDecoration(
+                        color: circlePlaceholderColor,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        MedicineIcons.resolve(_selectedIconKey),
+                        size: 70,
+                        color: const Color(0xFF6F6F6F),
+                      ),
                     ),
-                    child: Icon(
-                      MedicineIcons.resolve(_selectedIconKey),
-                      size: 70,
-                      color: const Color(0xFF6F6F6F),
+                  ),
+                  // Close Button (Top Right)
+                  Align(
+                    alignment: Alignment.topRight,
+                    child: IconButton(
+                      icon: const Icon(
+                        Icons.close,
+                        size: 32,
+                        color: Colors.black87,
+                      ),
+                      onPressed: () => Navigator.pop(context),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              TextButton.icon(
+                onPressed: _showIconPicker,
+                icon: const Icon(Icons.edit_outlined, size: 18),
+                label: const Text('Edit icon'),
+              ),
+
+              const SizedBox(height: 20),
+
+              // 2. Editable medicine name
+              TextField(
+                controller: _medicineNameController,
+                autofocus: false,
+                textAlign: TextAlign.center,
+                decoration: InputDecoration(
+                  hintText: 'Medicine name',
+                  border: InputBorder.none,
+                  hintStyle: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w400,
+                    color: textDark.withValues(alpha: 0.45),
+                  ),
+                ),
+                style: TextStyle(
+                  fontSize: 34,
+                  fontWeight: FontWeight.w400,
+                  color: textDark,
+                  letterSpacing: -0.5,
+                ),
+              ),
+
+              // 3. Doses Left (Monospace)
+              Text(
+                '$_currentStock doses left',
+                style: const TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 13,
+                  color: Color(0xFF8C8C8C),
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // 4. Progress Bar (With Dynamic Color)
+              Container(
+                height: 12,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: progressInactiveColor,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: FractionallySizedBox(
+                  alignment: Alignment.centerLeft,
+                  widthFactor: _progressFactor(lowThreshold),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: _getProgressColor(), // ✅ Use dynamic color
+                      borderRadius: BorderRadius.circular(6),
                     ),
                   ),
                 ),
-                // Close Button (Top Right)
-                Align(
-                  alignment: Alignment.topRight,
-                  child: IconButton(
+              ),
+
+              const SizedBox(height: 24),
+
+              // 5. Details Form Fields
+              _buildDetailInputRow(
+                label: 'Low Stock:',
+                controller: _lowStockController,
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 12),
+              _buildDateRow(),
+
+              // Expiry Warning Label
+              if (expiryText != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8.0, left: 90),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.warning_amber_rounded,
+                        size: 16,
+                        color: progressYellowColor,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        expiryText,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: progressYellowColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+              const SizedBox(height: 24),
+
+              // 6. Current Stock Section
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Current Stock:',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: labelColor,
+                  ),
+                ),
+              ),
+
+              // Stepper Control (+ / -)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  IconButton(
                     icon: const Icon(
-                      Icons.close,
-                      size: 32,
+                      Icons.remove,
+                      size: 36,
                       color: Colors.black87,
                     ),
-                    onPressed: () => Navigator.pop(context),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
+                    onPressed: _decrementStock,
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            TextButton.icon(
-              onPressed: _showIconPicker,
-              icon: const Icon(Icons.edit_outlined, size: 18),
-              label: const Text('Edit icon'),
-            ),
-
-            const SizedBox(height: 20),
-
-            // 2. Editable medicine name
-            TextField(
-              controller: _medicineNameController,
-              textAlign: TextAlign.center,
-              decoration: InputDecoration(
-                hintText: 'Medicine name',
-                border: InputBorder.none,
-                hintStyle: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w400,
-                  color: textDark.withOpacity(0.45),
-                ),
-              ),
-              style: TextStyle(
-                fontSize: 34,
-                fontWeight: FontWeight.w400,
-                color: textDark,
-                letterSpacing: -0.5,
-              ),
-            ),
-
-            // 3. Doses Left (Monospace)
-            Text(
-              '$_currentStock doses left',
-              style: const TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 13,
-                color: Color(0xFF8C8C8C),
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // 4. Progress Bar
-            Container(
-              height: 12,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: progressInactiveColor,
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: FractionallySizedBox(
-                alignment: Alignment.centerLeft,
-                widthFactor: _progressFactor(lowThreshold),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: progressActiveColor,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // 5. Details Form Fields
-            _buildDetailInputRow(
-              label: 'Low Stock:',
-              controller: _lowStockController,
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: 12),
-            _buildDateRow(),
-
-            // Expiry Warning Label
-            if (expiryText != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 8.0, left: 90),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.warning_amber_rounded,
-                      size: 16,
-                      color: progressActiveColor,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      expiryText,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: progressActiveColor,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-            const SizedBox(height: 24),
-
-            // 6. Current Stock Section
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Current Stock:',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  color: labelColor,
-                ),
-              ),
-            ),
-
-            // Stepper Control (+ / -)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                IconButton(
-                  icon: const Icon(
-                    Icons.remove,
-                    size: 36,
-                    color: Colors.black87,
-                  ),
-                  onPressed: _decrementStock,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Align(
-                    alignment: Alignment.center,
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 120),
-                      child: TextField(
-                        controller: _currentStockController,
-                        keyboardType: TextInputType.number,
-                        textInputAction: TextInputAction.done,
-                        inputFormatters: <TextInputFormatter>[
-                          FilteringTextInputFormatter.digitsOnly,
-                        ],
-                        textAlign: TextAlign.center,
-                        onChanged: (String value) {
-                          final int? parsed = int.tryParse(value);
-                          setState(() {
-                            _currentStock = parsed ?? 0;
-                          });
-                        },
-                        decoration: const InputDecoration(
-                          border: InputBorder.none,
-                          isDense: true,
-                          contentPadding: EdgeInsets.zero,
-                        ),
-                        style: TextStyle(
-                          fontSize: 64,
-                          fontWeight: FontWeight.w500,
-                          fontStyle: FontStyle.italic,
-                          color: textDark,
-                          height: 1.1,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.center,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 120),
+                        child: TextField(
+                          controller: _currentStockController,
+                          autofocus: false,
+                          keyboardType: TextInputType.number,
+                          textInputAction: TextInputAction.done,
+                          inputFormatters: <TextInputFormatter>[
+                            FilteringTextInputFormatter.digitsOnly,
+                          ],
+                          textAlign: TextAlign.center,
+                          onChanged: (String value) {
+                            final int? parsed = int.tryParse(value);
+                            setState(() {
+                              _currentStock = parsed ?? 0;
+                            });
+                          },
+                          decoration: const InputDecoration(
+                            border: InputBorder.none,
+                            isDense: true,
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                          style: TextStyle(
+                            fontSize: 64,
+                            fontWeight: FontWeight.w500,
+                            fontStyle: FontStyle.italic,
+                            color: textDark,
+                            height: 1.1,
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                IconButton(
-                  icon: const Icon(Icons.add, size: 36, color: Colors.black87),
-                  onPressed: _incrementStock,
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 24),
-
-            // 7. Save Button
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton(
-                onPressed: _saveStock,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: saveBtnBgColor,
-                  foregroundColor: textDark,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                  const SizedBox(width: 12),
+                  IconButton(
+                    icon: const Icon(
+                      Icons.add,
+                      size: 36,
+                      color: Colors.black87,
+                    ),
+                    onPressed: _incrementStock,
                   ),
-                ),
-                child: const Text(
-                  'SAVE',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1.0,
+                ],
+              ),
+
+              const SizedBox(height: 24),
+
+              // 7. Save Button
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton(
+                  onPressed: _saveStock,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: saveBtnBgColor,
+                    foregroundColor: textDark,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: const Text(
+                    'SAVE',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.0,
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -527,7 +564,7 @@ class _StockEditModalState extends State<StockEditModal> {
               borderRadius: BorderRadius.circular(8),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
+                  color: Colors.black.withValues(alpha: 0.04),
                   blurRadius: 4,
                   offset: const Offset(0, 2),
                 ),
@@ -535,6 +572,7 @@ class _StockEditModalState extends State<StockEditModal> {
             ),
             child: TextField(
               controller: controller,
+              autofocus: false,
               keyboardType: keyboardType,
               decoration: const InputDecoration(border: InputBorder.none),
               textAlign: TextAlign.center,
@@ -577,7 +615,7 @@ class _StockEditModalState extends State<StockEditModal> {
                 borderRadius: BorderRadius.circular(8),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
+                    color: Colors.black.withValues(alpha: 0.04),
                     blurRadius: 4,
                     offset: const Offset(0, 2),
                   ),

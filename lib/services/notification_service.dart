@@ -1,4 +1,6 @@
+// services/notification_service.dart
 import 'dart:typed_data';
+import 'package:flutter/material.dart'; // ADD THIS IMPORT FOR TimeOfDay
 
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
@@ -218,7 +220,7 @@ class NotificationService {
         notificationId: baseNotificationId + attempt,
         title: 'Reminder Test',
         body:
-            'This is a preview of reminder style $alertLevel. Attempt ${attempt + 1} of $_escalationAttempts.',
+            "This is a preview of reminder style $alertLevel. Attempt ${attempt + 1} of $_escalationAttempts.",
         scheduledDate: now.add(initialDelay + (stepDelay * attempt)),
         notificationDetails: _notificationDetailsForAttempt(attempt),
       );
@@ -249,6 +251,79 @@ class NotificationService {
         ),
       );
     }
+    await Future.wait(cancelOperations);
+  }
+
+  /// CANCEL ALL NOTIFICATIONS FOR A MEDICINE (NEW METHOD)
+  /// Used when deleting a medicine record
+  static Future<void> cancelAllRemindersForMedicine({
+    required int medicineCreatedAtMillis,
+    required DateTime? reminderStartDate,
+    required DateTime? reminderEndDate,
+    required TimeOfDay? reminderTime,
+  }) async {
+    if (!_initialized) {
+      await initialize();
+    }
+
+    final List<Future<void>> cancelOperations = <Future<void>>[];
+
+    // If there's a date range, cancel notifications for each day in the range
+    if (reminderStartDate != null &&
+        reminderEndDate != null &&
+        reminderTime != null) {
+      DateTime cursor = DateTime(
+        reminderStartDate.year,
+        reminderStartDate.month,
+        reminderStartDate.day,
+      );
+      final DateTime end = DateTime(
+        reminderEndDate.year,
+        reminderEndDate.month,
+        reminderEndDate.day,
+        23,
+        59,
+        59,
+      );
+
+      while (!cursor.isAfter(end)) {
+        final DateTime scheduledAt = DateTime(
+          cursor.year,
+          cursor.month,
+          cursor.day,
+          reminderTime.hour,
+          reminderTime.minute,
+        );
+
+        cancelOperations.add(
+          cancelEscalatingReminderAttempts(
+            medicineCreatedAtMillis: medicineCreatedAtMillis,
+            scheduledAt: scheduledAt,
+          ),
+        );
+
+        cursor = cursor.add(const Duration(days: 1));
+      }
+    } else if (reminderTime != null) {
+      // Single reminder (no date range) - create a default date
+      final DateTime today = DateTime.now();
+      final DateTime scheduledAt = DateTime(
+        today.year,
+        today.month,
+        today.day,
+        reminderTime.hour,
+        reminderTime.minute,
+      );
+
+      cancelOperations.add(
+        cancelEscalatingReminderAttempts(
+          medicineCreatedAtMillis: medicineCreatedAtMillis,
+          scheduledAt: scheduledAt,
+        ),
+      );
+    }
+
+    // Wait for all cancellation operations to complete
     await Future.wait(cancelOperations);
   }
 

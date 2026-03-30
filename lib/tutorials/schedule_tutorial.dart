@@ -1,3 +1,4 @@
+// tutorials/schedule_tutorial.dart
 import 'package:flutter/material.dart';
 import 'package:showcaseview/showcaseview.dart';
 
@@ -21,8 +22,11 @@ void clearScheduleTutorialContinuation() {
   _pendingScheduleTutorialContinuation = null;
 }
 
-Future<void> handleScheduleTutorialShowcaseComplete(GlobalKey? completedKey) async {
-  if (completedKey == null || completedKey != _pendingScheduleTutorialIntroKey) {
+Future<void> handleScheduleTutorialShowcaseComplete(
+  GlobalKey? completedKey,
+) async {
+  if (completedKey == null ||
+      completedKey != _pendingScheduleTutorialIntroKey) {
     return;
   }
 
@@ -118,8 +122,9 @@ Future<void> startScheduleTutorialIfNeeded({
   required List<GlobalKey> introSteps,
   required List<GlobalKey> dosageSteps,
 }) async {
-  final bool hasSeenTutorial =
-      await TutorialPreferences.hasSeen(TutorialPreferences.scheduleTutorialSeenKey);
+  final bool hasSeenTutorial = await TutorialPreferences.hasSeen(
+    TutorialPreferences.scheduleTutorialSeenKey,
+  );
 
   if (hasSeenTutorial || !isMounted()) {
     return;
@@ -134,5 +139,7 @@ Future<void> startScheduleTutorialIfNeeded({
     dosageSteps: dosageSteps,
   );
 
-  await TutorialPreferences.markSeen(TutorialPreferences.scheduleTutorialSeenKey);
+  await TutorialPreferences.markSeen(
+    TutorialPreferences.scheduleTutorialSeenKey,
+  );
 }

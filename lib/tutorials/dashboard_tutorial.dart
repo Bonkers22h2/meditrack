@@ -1,13 +1,10 @@
+// tutorials/dashboard_tutorial.dart
 import 'package:flutter/material.dart';
 import 'package:showcaseview/showcaseview.dart';
 
 import 'package:meditrack/tutorials/tutorial_preferences.dart';
 
-enum DashboardHelpSection {
-  dashboardOverview,
-  addSchedule,
-  manageStocks,
-}
+enum DashboardHelpSection { dashboardOverview, addSchedule, manageStocks }
 
 List<GlobalKey> buildDashboardTutorialSteps({
   required GlobalKey titleShowcaseKey,
@@ -42,8 +39,9 @@ Future<void> startDashboardTutorialIfNeeded({
   required bool Function() isMounted,
   required List<GlobalKey> steps,
 }) async {
-  final bool hasSeenTutorial =
-      await TutorialPreferences.hasSeen(TutorialPreferences.dashboardTutorialSeenKey);
+  final bool hasSeenTutorial = await TutorialPreferences.hasSeen(
+    TutorialPreferences.dashboardTutorialSeenKey,
+  );
 
   if (hasSeenTutorial || !isMounted()) {
     return;
@@ -55,7 +53,9 @@ Future<void> startDashboardTutorialIfNeeded({
     steps: steps,
   );
 
-  await TutorialPreferences.markSeen(TutorialPreferences.dashboardTutorialSeenKey);
+  await TutorialPreferences.markSeen(
+    TutorialPreferences.dashboardTutorialSeenKey,
+  );
 }
 
 String dashboardHelpSectionTitle(DashboardHelpSection section) {
@@ -81,9 +81,7 @@ Future<DashboardHelpSection?> showDashboardHelpSectionsPopup({
       final List<DashboardHelpSection> sections = DashboardHelpSection.values;
 
       return Dialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxHeight: 360),
           child: Padding(
@@ -114,10 +112,7 @@ Future<DashboardHelpSection?> showDashboardHelpSectionsPopup({
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                        trailing: Icon(
-                          Icons.chevron_right,
-                          color: textLight,
-                        ),
+                        trailing: Icon(Icons.chevron_right, color: textLight),
                         onTap: () {
                           Navigator.of(context).pop(section);
                         },

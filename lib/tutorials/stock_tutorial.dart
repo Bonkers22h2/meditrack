@@ -1,3 +1,4 @@
+// tutorials/stock_tutorial.dart
 import 'package:flutter/material.dart';
 import 'package:showcaseview/showcaseview.dart';
 
@@ -36,8 +37,9 @@ Future<void> startStockTutorialIfNeeded({
   required bool Function() isMounted,
   required List<GlobalKey> steps,
 }) async {
-  final bool hasSeenTutorial =
-      await TutorialPreferences.hasSeen(TutorialPreferences.stockTutorialSeenKey);
+  final bool hasSeenTutorial = await TutorialPreferences.hasSeen(
+    TutorialPreferences.stockTutorialSeenKey,
+  );
 
   if (hasSeenTutorial || !isMounted()) {
     return;

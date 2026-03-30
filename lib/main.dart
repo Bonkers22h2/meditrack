@@ -1,3 +1,4 @@
+// main.dart
 import 'package:flutter/material.dart';
 import 'package:meditrack/pages/dashboard.dart';
 import 'package:meditrack/services/notification_service.dart';

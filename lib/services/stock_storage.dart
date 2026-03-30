@@ -1,3 +1,4 @@
+// services/stock_storage.dart
 import 'dart:convert';
 import 'dart:math';
 
@@ -48,6 +49,26 @@ class StockRecord {
 
   bool get isRefillSoon => !isLowStock && currentStock <= lowStockThreshold + 3;
 
+  bool get isExpired {
+    if (expiryDate == null) {
+      return false;
+    }
+
+    final DateTime today = DateTime.now();
+    final DateTime normalizedToday = DateTime(
+      today.year,
+      today.month,
+      today.day,
+    );
+    final DateTime normalizedExpiry = DateTime(
+      expiryDate!.year,
+      expiryDate!.month,
+      expiryDate!.day,
+    );
+    final int daysLeft = normalizedExpiry.difference(normalizedToday).inDays;
+    return daysLeft < 0; // Days left is negative
+  }
+
   bool get isExpiringSoon {
     if (expiryDate == null) {
       return false;
@@ -68,6 +89,7 @@ class StockRecord {
     return daysLeft >= 0 && daysLeft <= 30;
   }
 
+  bool get hasValidExpiry => !isExpired && !isExpiringSoon;
   static DateTime? _tryParseDateTime(String? value) {
     if (value == null || value.isEmpty) {
       return null;

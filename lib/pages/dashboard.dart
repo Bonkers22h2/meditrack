@@ -1,3 +1,4 @@
+// lib/pages/dashboard.dart
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:meditrack/modals/medicine_details_modal.dart';
@@ -33,12 +34,8 @@ class MeditrackApp extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------
-// DASHBOARD SCREEN (Reminders) - UPDATED WITH TIME COLORS
-// ---------------------------------------------------------
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key, this.showFirstLoginSectionsPopup = false});
-
   final bool showFirstLoginSectionsPopup;
 
   @override
@@ -59,7 +56,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     IntroPopupPage(
       title: 'Getting Started',
       description:
-          'Since it’s your first time, we’ll show you the main sections of the app:',
+          "Since it's your first time, we'll show you the main sections of the app:",
       steps: <String>[
         'Reminders: This is where you can set and view your medicine schedules',
         'Stocks: This is where you can manage your medicine stocks',
@@ -77,21 +74,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _isLoading = true;
   DateTime _selectedDate = DateTime.now();
 
-  // Color palette
   final Color backgroundColor = const Color(0xFFF4F5F0);
   final Color cardColor = Colors.white;
   final Color textFieldColor = const Color(0xFFE8E8E2);
-  final Color textDark = const Color(0xFF1A1A1A); // High contrast black
+  final Color textDark = const Color(0xFF1A1A1A);
   final Color textLight = const Color(0xFF757575);
   final Color textFaint = const Color(0xFF8B9084);
-
-  // New High-Contrast Subtitle color (Fixing the greyed out text issue)
   final Color textAccessibleSubtitle = const Color(0xFF616161);
-
-  // Time of Day Colors
-  final Color morningColor = const Color(0xFF56BFA8); // Teal from image
-  final Color afternoonColor = const Color(0xFFFFB74D); // Warm Orange
-  final Color nightColor = const Color(0xFF7986CB); // Indigo
+  final Color morningColor = const Color(0xFF56BFA8);
+  final Color afternoonColor = const Color(0xFFFFB74D);
+  final Color nightColor = const Color(0xFF7986CB);
 
   @override
   void initState() {
@@ -103,7 +95,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (!mounted) {
         return;
       }
-
       _showFirstLoginSectionsPopupThenTutorial();
     });
   }
@@ -125,11 +116,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     final bool hasSeenSectionsIntro =
         prefs.getBool(TutorialPreferences.firstLoginSectionsSeenKey) ?? false;
-
     if (!mounted) {
       return;
     }
-
     if (!hasSeenSectionsIntro) {
       await showDialog<void>(
         context: context,
@@ -138,14 +127,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
           return IntroPopupDialog(pages: _firstLoginSectionsPages);
         },
       );
-
       await prefs.setBool(TutorialPreferences.firstLoginSectionsSeenKey, true);
     }
-
     if (!mounted) {
       return;
     }
-
     await _startDashboardTutorialIfNeeded();
   }
 
@@ -157,7 +143,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           textLight: textLight,
           textFaint: textFaint,
         );
-
     if (selectedSection != null) {
       switch (selectedSection) {
         case DashboardHelpSection.dashboardOverview:
@@ -195,7 +180,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (!mounted) {
       return;
     }
-
     setState(() {
       _medicines = medicines.reversed.toList();
       _isLoading = false;
@@ -207,7 +191,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (!mounted) {
       return;
     }
-
     final Map<String, String> stockIconByMedicine = <String, String>{};
     for (final StockRecord stock in stocks) {
       final String key = stock.medicineName.trim().toLowerCase();
@@ -216,7 +199,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
       stockIconByMedicine[key] = stock.iconKey;
     }
-
     setState(() {
       _stockCount = stocks.length;
       _stockIconByMedicine = stockIconByMedicine;
@@ -229,11 +211,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         prefs.getStringList(_takenRemindersStorageKey) ?? <String>[];
     final List<String> deducted =
         prefs.getStringList(_deductedRemindersStorageKey) ?? <String>[];
-
     if (!mounted) {
       return;
     }
-
     setState(() {
       _takenReminderKeys = taken.toSet();
       _deductedReminderKeys = deducted.toSet();
@@ -275,16 +255,48 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (!_isSameDay(_selectedDate, today)) {
       return;
     }
-
     final String storageKey = _reminderStorageKey(reminder, _selectedDate);
     if (_takenReminderKeys.contains(storageKey)) {
       return;
     }
+    final String normalizedName = reminder.medicine.name.trim().toLowerCase();
 
+    // Guard against context access after disposal
+    if (!mounted) {
+      return;
+    }
+    final List<StockRecord> stocks = await StockStorage.loadStocks();
+    final StockRecord? stock = stocks.firstWhere(
+      (StockRecord s) => s.medicineName.trim().toLowerCase() == normalizedName,
+      orElse: () => throw StateError('No matching stock record'),
+    );
+
+    if (stock != null && stock.isExpired) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '❌ This medicine is expired. Cannot mark dose as taken.',
+            style: const TextStyle(color: Colors.white),
+          ),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
     setState(() {
       _takenReminderKeys.add(storageKey);
     });
-
     await _persistReminderCompletionState();
 
     final DateTime scheduledAt = DateTime(
@@ -318,13 +330,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         unawaited(_loadStocks());
       }
     }
-
     await _persistReminderCompletionState();
 
     if (!mounted) {
       return;
     }
-
     final String message = deducted
         ? 'Deducted $doseCount pill${doseCount == 1 ? '' : 's'} from ${reminder.medicine.name} stock.'
         : 'Reminder marked done.';
@@ -342,7 +352,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       builder: (BuildContext context) =>
           MedicineModal(startScheduleTutorial: startScheduleTutorial),
     );
-
     if (didSave == true) {
       await _loadMedicines();
     }
@@ -358,7 +367,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return MedicineDetailsModal(medicine: medicine);
       },
     );
-
     if (didChange == true) {
       await _loadMedicines();
     }
@@ -370,7 +378,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (dose.isEmpty && frequency.isEmpty) {
       return 'No dosage details';
     }
-
     if (dose.isEmpty) {
       return frequency;
     }
@@ -389,7 +396,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 12),
-                // 1. Top Bar (Logo + Settings)
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -418,7 +424,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             shape: BoxShape.circle,
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.03),
+                                color: Colors.black.withValues(alpha: 0.03),
                                 blurRadius: 10,
                                 offset: const Offset(0, 4),
                               ),
@@ -443,7 +449,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             shape: BoxShape.circle,
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.03),
+                                color: Colors.black.withValues(alpha: 0.03),
                                 blurRadius: 10,
                                 offset: const Offset(0, 4),
                               ),
@@ -472,7 +478,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ],
                 ),
                 const SizedBox(height: 22),
-                // 2. Title and Schedule Medication button
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
@@ -481,7 +486,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         key: _titleShowcaseKey,
                         title: 'Reminders dashboard overview',
                         description:
-                            'This is the reminders dashboard where you can review today\'s medication list.',
+                            "This is the reminders dashboard where you can review today's medication list.",
                         child: Text(
                           'Reminders',
                           style: TextStyle(
@@ -526,7 +531,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                // Date selector row
                 Showcase(
                   key: _dateSelectorShowcaseKey,
                   title: 'Pick a day',
@@ -610,6 +614,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildDateSelector() {
     final DateTime today = DateTime.now();
+    // Show 3 days before → today → 3 days after
     final List<DateTime> days = List.generate(
       7,
       (i) => today.add(Duration(days: i - 3)),
@@ -653,13 +658,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildRemindersForSelectedDate() {
-    final List<_ReminderInstance> reminders = _expandRemindersForDate(
+    final List<_ReminderInstance> allReminders = _expandRemindersForDate(
       _selectedDate,
     );
+
+    final bool isToday = _isSameDay(_selectedDate, DateTime.now());
+    final List<_ReminderInstance> reminders;
+
+    // ✅ FIXED: Show ALL reminders regardless of time passed
+    // No longer filters by .isAfter(now) - preserves complete history
+    reminders = allReminders;
+
     if (reminders.isEmpty) {
       return Center(
         child: Text(
-          'No reminders for this day',
+          isToday
+              ? 'No upcoming reminders for today'
+              : 'No reminders for this day',
           style: TextStyle(
             color: textFaint,
             fontSize: 15,
@@ -669,11 +684,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
       );
     }
 
+    // Grouping logic remains unchanged...
     final Map<String, List<_ReminderInstance>> grouped = {
       'Morning': [],
       'Afternoon': [],
       'Night': [],
     };
+
     for (final r in reminders) {
       final int hour = r.time.hour;
       if (hour >= 5 && hour < 12) {
@@ -684,6 +701,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         grouped['Night']!.add(r);
       }
     }
+
     for (final group in grouped.values) {
       group.sort((a, b) => a.time.compareTo(b.time));
     }
@@ -717,8 +735,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final bool isToday = _isSameDay(_selectedDate, DateTime.now());
     final String reminderKey = _reminderStorageKey(reminder, _selectedDate);
     final bool isChecked = _takenReminderKeys.contains(reminderKey);
-
-    // Determine period colors based on the time
     Color periodColor;
     final int hour = reminder.time.hour;
     if (hour >= 5 && hour < 12) {
@@ -736,7 +752,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 8,
             offset: const Offset(0, 3),
           ),
@@ -751,7 +767,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // NEW: Colored Left Border Indicator
                 Container(
                   width: 6,
                   decoration: BoxDecoration(
@@ -762,8 +777,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ),
                 ),
-
-                // Card Content
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
@@ -772,7 +785,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                     child: Row(
                       children: [
-                        // Medicine Icon
                         Container(
                           width: 38,
                           height: 38,
@@ -787,8 +799,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           ),
                         ),
                         const SizedBox(width: 14),
-
-                        // Time
                         Text(
                           reminder.time.format(context),
                           style: TextStyle(
@@ -798,8 +808,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           ),
                         ),
                         const SizedBox(width: 16),
-
-                        // Text Information (Name & Accessible Subtitle)
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -817,7 +825,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               Text(
                                 _buildSubtitle(medicine),
                                 style: TextStyle(
-                                  // NEW: Fixed grey text issue - highly readable dark grey
                                   color: textAccessibleSubtitle,
                                   fontSize: 14,
                                   fontWeight: FontWeight.w500,
@@ -826,12 +833,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ],
                           ),
                         ),
-
-                        // NEW: Large accessible custom checkbox tap target
                         GestureDetector(
-                          onTap: (!isToday || isChecked)
-                              ? null
-                              : () => _markReminderAsTaken(reminder),
+                          // FIX: Allow tap on any date, but action only valid if isToday
+                          onTap:
+                              (!isChecked) // Only allow interaction if not already checked
+                              ? () {
+                                  if (!isToday)
+                                    return; // Prevent marking non-today as taken
+                                  _markReminderAsTaken(reminder);
+                                }
+                              : null,
                           child: Container(
                             width: 36,
                             height: 36,
@@ -871,40 +882,65 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   List<_ReminderInstance> _expandRemindersForDate(DateTime date) {
     final List<_ReminderInstance> result = [];
+    // Normalize selected date to midnight (date-only comparison)
+    final DateTime selectedDateOnly = DateTime(
+      date.year,
+      date.month,
+      date.day,
+      0,
+      0,
+      0,
+    );
+
     for (final medicine in _medicines) {
+      // Skip medicines without time info
+      if (medicine.specificTime == null) continue;
+
+      // Handle Range-Based Meds (with start/end dates)
       if (medicine.reminderStartDate != null &&
-          medicine.reminderEndDate != null &&
-          medicine.specificTime != null) {
-        final DateTime d = DateTime(date.year, date.month, date.day);
-        final DateTime start = DateTime(
+          medicine.reminderEndDate != null) {
+        // Normalize start/end to date-only (midnight)
+        final DateTime startOnly = DateTime(
           medicine.reminderStartDate!.year,
           medicine.reminderStartDate!.month,
           medicine.reminderStartDate!.day,
         );
-        final DateTime end = DateTime(
+        final DateTime endOnly = DateTime(
           medicine.reminderEndDate!.year,
           medicine.reminderEndDate!.month,
           medicine.reminderEndDate!.day,
         );
-        if (!d.isBefore(start) && !d.isAfter(end)) {
-          result.add(
-            _ReminderInstance(
-              medicine: medicine,
-              time: TimeOfDay(
-                hour: medicine.specificTime!.hour,
-                minute: medicine.specificTime!.minute,
-              ),
-            ),
-          );
+
+        // ⚠️ CRITICAL FIX: DO NOT create reminders before start date
+        if (selectedDateOnly.isBefore(startOnly)) {
+          continue;
         }
-      } else if (medicine.specificTime != null) {
-        final DateTime d = DateTime(date.year, date.month, date.day);
-        final DateTime t = DateTime(
+        // Filter OUT: Medicines that have ended
+        if (selectedDateOnly.isAfter(endOnly)) {
+          continue;
+        }
+
+        result.add(
+          _ReminderInstance(
+            medicine: medicine,
+            time: TimeOfDay(
+              hour: medicine.specificTime!.hour,
+              minute: medicine.specificTime!.minute,
+            ),
+          ),
+        );
+      }
+      // Handle One-Time / Single Date Meds (No Range Set)
+      else if (medicine.specificTime != null &&
+          medicine.reminderStartDate == null) {
+        // Exact match required for single-intake medicines
+        final DateTime targetDate = DateTime(
           medicine.specificTime!.year,
           medicine.specificTime!.month,
           medicine.specificTime!.day,
         );
-        if (d == t) {
+
+        if (_isSameDay(targetDate, selectedDateOnly)) {
           result.add(
             _ReminderInstance(
               medicine: medicine,
@@ -924,10 +960,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 
+  // FIXED: Uses normalization to ensure accurate Today/Yesterday labels
   String _dateLabel(DateTime date, DateTime today) {
-    if (_isSameDay(date, today)) return 'Today';
-    if (_isSameDay(date, today.add(const Duration(days: 1)))) return 'Tomorrow';
-    if (_isSameDay(date, today.subtract(const Duration(days: 1))))
+    final DateTime normalizedDate = DateTime(date.year, date.month, date.day);
+    final DateTime normalizedToday = DateTime(
+      today.year,
+      today.month,
+      today.day,
+    );
+
+    if (normalizedDate == normalizedToday) return 'Today';
+    if (normalizedDate == normalizedToday.add(const Duration(days: 1)))
+      return 'Tomorrow';
+    if (normalizedDate == normalizedToday.subtract(const Duration(days: 1)))
       return 'Yesterday';
     return '${date.month}/${date.day}';
   }
@@ -939,12 +984,8 @@ class _ReminderInstance {
   _ReminderInstance({required this.medicine, required this.time});
 }
 
-// ---------------------------------------------------------
-// LOGIN SCREEN (RESTORED - Exactly as requested)
-// ---------------------------------------------------------
 class MeditrackLoginScreen extends StatelessWidget {
   const MeditrackLoginScreen({super.key});
-
   final Color backgroundColor = const Color(0xFFF4F5F0);
   final Color cardColor = Colors.white;
   final Color textFieldColor = const Color(0xFFE8E8E2);
@@ -973,7 +1014,7 @@ class MeditrackLoginScreen extends StatelessWidget {
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.03),
+                        color: Colors.black.withValues(alpha: 0.03),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       ),
@@ -1014,7 +1055,7 @@ class MeditrackLoginScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(24),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
+                        color: Colors.black.withValues(alpha: 0.04),
                         blurRadius: 20,
                         offset: const Offset(0, 10),
                       ),
@@ -1107,6 +1148,7 @@ class MeditrackLoginScreen extends StatelessWidget {
 
   Widget _buildTextField({required bool obscureText}) {
     return TextField(
+      autofocus: false,
       obscureText: obscureText,
       style: TextStyle(color: textDark, fontSize: 16),
       decoration: InputDecoration(

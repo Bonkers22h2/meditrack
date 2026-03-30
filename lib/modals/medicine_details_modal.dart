@@ -1,7 +1,9 @@
+// modals/medicine_details_modal.dart
 import 'package:flutter/material.dart';
 import 'package:meditrack/modals/medicine_modal.dart';
 import 'package:meditrack/services/medicine_icons.dart';
 import 'package:meditrack/services/medicine_storage.dart';
+import 'package:meditrack/services/notification_service.dart';
 
 class MedicineDetailsModal extends StatefulWidget {
   const MedicineDetailsModal({required this.medicine, super.key});
@@ -93,7 +95,9 @@ class _MedicineDetailsModalState extends State<MedicineDetailsModal> {
                         ),
                         _buildInfoRow(
                           'Frequency',
-                          _displayValue(widget.medicine.frequency),
+                          _formatFrequencyToNaturalLanguage(
+                            widget.medicine.frequency,
+                          ),
                         ),
                       ],
                     ),
@@ -334,6 +338,58 @@ class _MedicineDetailsModalState extends State<MedicineDetailsModal> {
     return '$date, $time';
   }
 
+  // NEW HELPER FUNCTION: Converts technical frequency strings to natural language
+  String _formatFrequencyToNaturalLanguage(String frequency) {
+    final String trimmed = frequency.trim();
+    if (trimmed.isEmpty) return 'Not set';
+
+    // Try to extract hours from "Every X hours" format
+    final RegExp everyHoursRegex = RegExp(
+      r'^Every (\d+(?:\.\d+)?) hours$',
+      caseSensitive: false,
+    );
+    final Match? match = everyHoursRegex.firstMatch(trimmed);
+
+    if (match != null) {
+      final double hours = double.parse(match.group(1)!);
+
+      if (hours == 24) {
+        return 'Once daily';
+      } else if (hours == 12) {
+        return 'Twice daily';
+      } else if (hours == 8) {
+        return 'Three times daily';
+      } else if (hours == 6) {
+        return 'Four times daily';
+      } else if (hours == 4) {
+        return 'Every 4 hours';
+      } else if (hours == 3) {
+        return 'Every 3 hours';
+      } else if (hours == 2) {
+        return 'Every 2 hours';
+      } else if (hours == 1) {
+        return 'Every hour';
+      } else if (hours == 48) {
+        return 'Every other day';
+      } else {
+        // For custom intervals, keep the original format but clean it up
+        return 'Every ${hours.toStringAsFixed(hours == hours.toInt() ? 0 : 1)} hours';
+      }
+    }
+
+    // For weekly schedules like "Every 24 hours on Mon, Wed, Fri"
+    final RegExp weeklyRegex = RegExp(
+      r'^Every \d+(?:\.\d+)? hours on (.+)$',
+      caseSensitive: false,
+    );
+    if (weeklyRegex.hasMatch(trimmed)) {
+      return 'Weekly schedule';
+    }
+
+    // Return original if no pattern matches
+    return trimmed;
+  }
+
   Future<void> _editMedicine() async {
     final bool? didUpdate = await showModalBottomSheet<bool>(
       context: context,
@@ -361,7 +417,7 @@ class _MedicineDetailsModalState extends State<MedicineDetailsModal> {
         return AlertDialog(
           title: const Text('Delete medication?'),
           content: const Text(
-            'This will remove the medication from your reminders list.',
+            'This will remove the medication and cancel all scheduled reminders.',
           ),
           actions: [
             TextButton(
@@ -386,6 +442,21 @@ class _MedicineDetailsModalState extends State<MedicineDetailsModal> {
     });
 
     try {
+      // FIRST: Cancel all scheduled notifications for this medicine
+      await NotificationService.cancelAllRemindersForMedicine(
+        medicineCreatedAtMillis:
+            widget.medicine.createdAt.millisecondsSinceEpoch,
+        reminderStartDate: widget.medicine.reminderStartDate,
+        reminderEndDate: widget.medicine.reminderEndDate,
+        reminderTime: widget.medicine.specificTime != null
+            ? TimeOfDay(
+                hour: widget.medicine.specificTime!.hour,
+                minute: widget.medicine.specificTime!.minute,
+              )
+            : null,
+      );
+
+      // THEN: Delete from storage
       await MedicineStorage.deleteMedicine(widget.medicine);
     } catch (_) {
       if (!mounted) {

@@ -1,3 +1,4 @@
+// pages/stocks.dart
 import 'package:flutter/material.dart';
 import 'package:meditrack/modals/stock_modal.dart';
 import 'package:meditrack/services/stock_storage.dart';
@@ -22,20 +23,16 @@ class _StockScreenState extends State<StockScreen> {
   final GlobalKey _stockListShowcaseKey = GlobalKey();
   final GlobalKey _reportShowcaseKey = GlobalKey();
 
-  // Reusing the core colors
   final Color backgroundColor = const Color(0xFFF4F5F0);
   final Color cardColor = Colors.white;
   final Color textDark = const Color(0xFF1A1A1A);
   final Color textLight = const Color(0xFF757575);
   final Color textFaint = const Color(0xFF8B9084);
-
-  // Custom Section Header color
   final Color textSection = const Color(0xFFA1A69B);
 
-  // Exact card background colors matched from the image
-  final Color lowStockColor = const Color(0xFFFFC4CD); // Pastel Pink
-  final Color refillSoonColor = const Color(0xFFFFF1BD); // Pastel Yellow
-  final Color inStockColor = const Color(0xFFC0E5C4); // Pastel Green
+  final Color lowStockColor = const Color(0xFFFFC4CD);
+  final Color refillSoonColor = const Color(0xFFFFF1BD);
+  final Color inStockColor = const Color(0xFFC0E5C4);
 
   @override
   void initState() {
@@ -136,19 +133,36 @@ class _StockScreenState extends State<StockScreen> {
       );
     }
 
+    final List<StockRecord> expired = _stocks
+        .where((StockRecord stock) => stock.isExpired)
+        .toList();
     final List<StockRecord> lowStock = _stocks
-        .where((StockRecord stock) => stock.isLowStock)
+        .where((StockRecord stock) => stock.isLowStock && !stock.isExpired)
         .toList();
     final List<StockRecord> refillSoon = _stocks
-        .where((StockRecord stock) => stock.isRefillSoon)
+        .where((StockRecord stock) => stock.isRefillSoon && !stock.isExpired)
         .toList();
     final List<StockRecord> inStock = _stocks
-        .where((StockRecord stock) => !stock.isLowStock && !stock.isRefillSoon)
+        .where(
+          (StockRecord stock) =>
+              !stock.isLowStock && !stock.isRefillSoon && !stock.isExpired,
+        )
         .toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (expired.isNotEmpty) ...[
+          _buildSectionTitle('Expired'),
+          ...expired.map(
+            (StockRecord stock) => _buildMedicineCard(
+              stock: stock,
+              doses: _dosesText(stock.currentStock),
+              bgColor: const Color(0xFFFF6B6B),
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
         _buildSectionTitle('Low Stock'),
         ...lowStock.map(
           (StockRecord stock) => _buildMedicineCard(
@@ -191,7 +205,6 @@ class _StockScreenState extends State<StockScreen> {
             children: [
               const SizedBox(height: 16),
 
-              // 1. Top Bar (Logo + Settings)
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -212,7 +225,7 @@ class _StockScreenState extends State<StockScreen> {
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.03),
+                              color: Colors.black.withValues(alpha: 0.03),
                               blurRadius: 10,
                               offset: const Offset(0, 4),
                             ),
@@ -237,7 +250,7 @@ class _StockScreenState extends State<StockScreen> {
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.03),
+                              color: Colors.black.withValues(alpha: 0.03),
                               blurRadius: 10,
                               offset: const Offset(0, 4),
                             ),
@@ -259,7 +272,6 @@ class _StockScreenState extends State<StockScreen> {
 
               const SizedBox(height: 32),
 
-              // 2. Title
               Showcase(
                 key: _titleShowcaseKey,
                 title: 'Stock management',
@@ -293,7 +305,9 @@ class _StockScreenState extends State<StockScreen> {
                       backgroundColor: cardColor,
                       foregroundColor: textDark,
                       elevation: 0,
-                      side: BorderSide(color: textFaint.withOpacity(0.35)),
+                      side: BorderSide(
+                        color: textFaint.withValues(alpha: 0.35),
+                      ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
                       ),
@@ -312,13 +326,12 @@ class _StockScreenState extends State<StockScreen> {
                 key: _stockListShowcaseKey,
                 title: 'Track inventory',
                 description:
-                    'Low stock, refill soon, and in-stock items are grouped so you can prioritize what needs attention.',
+                    'Low stock, refill soon, expired, and in-stock items are grouped so you can prioritize what needs attention.',
                 child: _buildStockListBySection(),
               ),
 
               const SizedBox(height: 24),
 
-              // 6. View Report Button
               Showcase(
                 key: _reportShowcaseKey,
                 title: 'View reports',
@@ -333,7 +346,7 @@ class _StockScreenState extends State<StockScreen> {
                       border: Border.all(color: const Color(0xFFDCDCDC)),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.02),
+                          color: Colors.black.withValues(alpha: 0.02),
                           blurRadius: 4,
                           offset: const Offset(0, 2),
                         ),
@@ -374,7 +387,6 @@ class _StockScreenState extends State<StockScreen> {
     );
   }
 
-  // Helper method for Section Titles (e.g. "Low Stock")
   Widget _buildSectionTitle(String title) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12.0, top: 16.0),
@@ -389,12 +401,17 @@ class _StockScreenState extends State<StockScreen> {
     );
   }
 
-  // Helper method for the Medicine Pill Cards
   Widget _buildMedicineCard({
     required StockRecord stock,
     required String doses,
     required Color bgColor,
   }) {
+    final bool showWarning = stock.isExpired || stock.isExpiringSoon;
+    final IconData warningIcon = stock.isExpired
+        ? Icons.error_rounded
+        : Icons.warning_amber_rounded;
+    final String warningLabel = stock.isExpired ? 'Expired' : 'Expiring';
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -404,11 +421,11 @@ class _StockScreenState extends State<StockScreen> {
           margin: const EdgeInsets.only(bottom: 12.0),
           padding: const EdgeInsets.fromLTRB(20, 16, 24, 16),
           decoration: BoxDecoration(
-            color: bgColor,
+            color: stock.isExpired ? const Color(0xFFFF6B6B) : bgColor,
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.05),
+                color: Colors.black.withValues(alpha: 0.05),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -417,20 +434,16 @@ class _StockScreenState extends State<StockScreen> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              if (stock.isExpiringSoon) ...[
+              if (showWarning) ...[
                 Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      Icons.warning_amber_rounded,
-                      color: textDark,
-                      size: 20,
-                    ),
+                    Icon(warningIcon, color: Colors.white, size: 20),
                     Text(
-                      'Expiring',
+                      warningLabel,
                       style: TextStyle(
                         fontSize: 8,
-                        color: textDark,
+                        color: Colors.white,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -444,7 +457,7 @@ class _StockScreenState extends State<StockScreen> {
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
-                  color: textDark,
+                  color: stock.isExpired ? Colors.white : textDark,
                 ),
               ),
 

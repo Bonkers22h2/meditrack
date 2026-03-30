@@ -1,3 +1,4 @@
+// modals/settings_modal.dart
 import 'package:flutter/material.dart';
 import 'package:meditrack/services/notification_service.dart';
 import 'package:meditrack/tutorials/tutorial_preferences.dart';
@@ -177,7 +178,9 @@ class _SettingsModalState extends State<SettingsModal> {
                           ),
                         ),
                         style: OutlinedButton.styleFrom(
-                          side: BorderSide(color: textFaint.withOpacity(0.35)),
+                          side: BorderSide(
+                            color: textFaint.withValues(alpha: 0.35),
+                          ),
                           backgroundColor: cardColor,
                           padding: const EdgeInsets.symmetric(
                             horizontal: 14,
@@ -207,7 +210,9 @@ class _SettingsModalState extends State<SettingsModal> {
                           ),
                         ),
                         style: OutlinedButton.styleFrom(
-                          side: BorderSide(color: textFaint.withOpacity(0.35)),
+                          side: BorderSide(
+                            color: textFaint.withValues(alpha: 0.35),
+                          ),
                           backgroundColor: cardColor,
                           padding: const EdgeInsets.symmetric(
                             horizontal: 14,
@@ -217,7 +222,9 @@ class _SettingsModalState extends State<SettingsModal> {
                             borderRadius: BorderRadius.circular(14),
                           ),
                         ),
-                        onPressed: _isResettingTutorials ? null : _resetTutorials,
+                        onPressed: _isResettingTutorials
+                            ? null
+                            : _resetTutorials,
                       ),
                     ),
                   ],
