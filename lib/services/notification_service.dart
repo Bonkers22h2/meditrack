@@ -266,9 +266,9 @@ class NotificationService {
       await initialize();
     }
 
-    final List<Future<void>> cancelOperations = <Future<void>>[];
+    final List<Future<void>> cancelOperations = [];
 
-    // If there's a date range, cancel notifications for each day in the range
+    // If there's a date range, prepare cancellation futures for each day
     if (reminderStartDate != null &&
         reminderEndDate != null &&
         reminderTime != null) {
@@ -277,6 +277,7 @@ class NotificationService {
         reminderStartDate.month,
         reminderStartDate.day,
       );
+
       final DateTime end = DateTime(
         reminderEndDate.year,
         reminderEndDate.month,
@@ -295,6 +296,7 @@ class NotificationService {
           reminderTime.minute,
         );
 
+        // We collect the futures without 'await' to start them all at once
         cancelOperations.add(
           cancelEscalatingReminderAttempts(
             medicineCreatedAtMillis: medicineCreatedAtMillis,
@@ -304,8 +306,9 @@ class NotificationService {
 
         cursor = cursor.add(const Duration(days: 1));
       }
-    } else if (reminderTime != null) {
-      // Single reminder (no date range) - create a default date
+    }
+    // Handle single reminder instances (when no range is provided)
+    else if (reminderTime != null) {
       final DateTime today = DateTime.now();
       final DateTime scheduledAt = DateTime(
         today.year,
@@ -323,8 +326,10 @@ class NotificationService {
       );
     }
 
-    // Wait for all cancellation operations to complete
-    await Future.wait(cancelOperations);
+    // Await all collected operations to complete together
+    if (cancelOperations.isNotEmpty) {
+      await Future.wait(cancelOperations);
+    }
   }
 
   static Future<void> _scheduleEscalatingReminder({

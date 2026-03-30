@@ -36,7 +36,9 @@ class _MedicineModalState extends State<MedicineModal> {
   int _presetTapTimestamp = 0;
   final TextEditingController _medicineInputController =
       TextEditingController();
-  final TextEditingController _doseAmountController = TextEditingController();
+  final TextEditingController _doseAmountController = TextEditingController(
+    text: '1 Pill',
+  );
   final TextEditingController _frequencyCountController =
       TextEditingController();
 
@@ -46,9 +48,11 @@ class _MedicineModalState extends State<MedicineModal> {
     true,
   ); // All days selected by default
 
-  DateTime? _reminderStartDate;
+  DateTime? _reminderStartDate = DateTime.now();
   DateTime? _reminderEndDate;
-  TimeOfDay? _reminderTime;
+  TimeOfDay? _reminderTime = TimeOfDay.fromDateTime(
+    DateTime.now().add(const Duration(minutes: 1)),
+  );
   String _selectedIconKey = MedicineIcons.defaultIconKey;
   bool _isSaving = false;
   List<String> _selectedMedicines = <String>[];
@@ -922,153 +926,64 @@ class _MedicineModalState extends State<MedicineModal> {
       _showSnackBar('Add at least one medication first.');
       return;
     }
+
     final String doseText = _doseAmountController.text.trim();
-    if (doseText.isEmpty) {
-      _showSnackBar('Dose amount is required.');
-      return;
-    }
-    if (!RegExp(r'^\d+(\.\d+)?$').hasMatch(doseText)) {
-      _showSnackBar('Dose amount must be a valid number.');
-      return;
-    }
-    if (_reminderTime == null) {
-      _showSnackBar('Please select a reminder time.');
-      return;
-    }
-    String frequencyText;
     final String hoursText = _frequencyCountController.text.trim();
-    if (hoursText.isEmpty) {
-      _showSnackBar('Provide interval hours.');
-      return;
-    }
     final double? hours = double.tryParse(hoursText);
-    if (hours == null || hours <= 0) {
-      _showSnackBar('Interval must be a positive number.');
+
+    if (doseText.isEmpty || hours == null || _reminderTime == null) {
+      _showSnackBar('Please fill in all required fields.');
       return;
     }
 
-    // Build frequency string including selected days
-    frequencyText = 'Every $hours hours';
-    final List<String> selectedDays = <String>[];
-    const List<String> dayLabels = <String>[
-      'Sun',
-      'Mon',
-      'Tue',
-      'Wed',
-      'Thu',
-      'Fri',
-      'Sat',
-    ];
-    for (int i = 0; i < 7; i++) {
-      if (_selectedWeekdays[i]) {
-        selectedDays.add(dayLabels[i]);
+    setState(() => _isSaving = true);
+
+    try {
+      final DateTime now = DateTime.now();
+      final List<MedicineRecord> recordsToSave = [];
+      final int remindersPerDay = (24 / hours).round();
+
+      // --- NEW FREQUENCY FORMATTING LOGIC ---
+      final String formattedHours = hours % 1 == 0
+          ? hours.toInt().toString()
+          : hours.toString();
+
+      final List<String> dayLabelsFull = [
+        'Sun',
+        'Mon',
+        'Tue',
+        'Wed',
+        'Thu',
+        'Fri',
+        'Sat',
+      ];
+      final List<String> selectedDayNames = [];
+      for (int i = 0; i < 7; i++) {
+        if (_selectedWeekdays[i]) selectedDayNames.add(dayLabelsFull[i]);
       }
-    }
-    if (selectedDays.length < 7) {
-      frequencyText += ' on ${selectedDays.join(', ')}';
-    }
 
-    if (_reminderStartDate != null || _reminderEndDate != null) {
-      if (_reminderStartDate == null || _reminderEndDate == null) {
-        _showSnackBar('Please select both start and end dates.');
-        return;
-      }
-    }
-    if (_reminderStartDate != null &&
-        _reminderEndDate != null &&
-        _reminderEndDate!.isBefore(_reminderStartDate!)) {
-      _showSnackBar('End date must be on or after start date.');
-      return;
-    }
-
-    final DateTime now = DateTime.now();
-    final DateTime normalizedNow = DateTime(now.year, now.month, now.day);
-
-    if (_reminderStartDate != null &&
-        _reminderStartDate!.isBefore(normalizedNow)) {
-      _showSnackBar(
-        'Start date cannot be in the past. Medicines cannot begin before today.',
-      );
-      return;
-    }
-
-    final bool hasReminderRange =
-        _reminderStartDate != null && _reminderEndDate != null;
-
-    DateTime? reminderDateTime;
-    if (_reminderTime != null) {
-      final DateTime baseDate = _reminderStartDate ?? now;
-      reminderDateTime = DateTime(
-        baseDate.year,
-        baseDate.month,
-        baseDate.day,
-        _reminderTime!.hour,
-        _reminderTime!.minute,
-      );
-    }
-
-    String? postSaveMessage;
-    if (!hasReminderRange &&
-        reminderDateTime != null &&
-        !reminderDateTime.isAfter(now)) {
-      // It's a single instance that passed. We will shift it to tomorrow below.
-      postSaveMessage =
-          'Reminder scheduled starting tomorrow, as the selected time has already passed today.';
-    }
-
-    final List<MedicineRecord> recordsToSave = <MedicineRecord>[];
-
-    // Calculate how many times per day based on interval
-    final int remindersPerDay;
-    final double intervalHours =
-        double.tryParse(_frequencyCountController.text) ?? 24;
-    remindersPerDay = (24 / intervalHours).round();
-
-    // Create medicine records for each medicine
-    for (int i = 0; i < _selectedMedicines.length; i += 1) {
-      final DateTime createdAt = widget.initialMedicine != null && i == 0
-          ? widget.initialMedicine!.createdAt
-          : now.add(Duration(microseconds: i + 1));
-
-      if (remindersPerDay <= 1 || _reminderTime == null) {
-        DateTime? adjustedSpecificTime = reminderDateTime;
-        DateTime? adjustedStartDate = _reminderStartDate;
-
-        // Shift to tomorrow if the time has already passed today
-        if (adjustedSpecificTime != null &&
-            adjustedSpecificTime.isBefore(now) &&
-            adjustedSpecificTime.year == now.year &&
-            adjustedSpecificTime.month == now.month &&
-            adjustedSpecificTime.day == now.day) {
-          adjustedSpecificTime = adjustedSpecificTime.add(
-            const Duration(days: 1),
-          );
-          if (adjustedStartDate != null) {
-            adjustedStartDate = adjustedStartDate.add(const Duration(days: 1));
-          }
-        }
-
-        recordsToSave.add(
-          MedicineRecord(
-            iconKey: _selectedIconKey,
-            name: _selectedMedicines[i],
-            doseAmount: _doseAmountController.text.trim(),
-            frequency: frequencyText,
-            specificTime: adjustedSpecificTime,
-            reminderStartDate: adjustedStartDate,
-            reminderEndDate: _reminderEndDate,
-            createdAt: createdAt,
-          ),
-        );
+      String freqText;
+      if (selectedDayNames.length == 7) {
+        freqText = 'Every $formattedHours hours';
       } else {
-        // Multiple reminders per day - create separate records
-        for (int j = 0; j < remindersPerDay; j++) {
-          final int intervalHour =
-              (_reminderTime!.hour + (j * (24 ~/ remindersPerDay))) % 24;
+        freqText =
+            'Every $formattedHours hours on ${selectedDayNames.join(', ')}';
+      }
+      // ---------------------------------------
 
+      for (int i = 0; i < _selectedMedicines.length; i++) {
+        final DateTime createdAt = widget.initialMedicine != null && i == 0
+            ? widget.initialMedicine!.createdAt
+            : now.add(Duration(microseconds: i + 1));
+
+        for (int j = 0; j < (remindersPerDay > 0 ? remindersPerDay : 1); j++) {
+          final int intervalHour =
+              (_reminderTime!.hour +
+                  (j * (24 ~/ (remindersPerDay > 0 ? remindersPerDay : 1)))) %
+              24;
           final DateTime baseDate = _reminderStartDate ?? now;
 
-          DateTime intervalSpecificTime = DateTime(
+          DateTime intervalTime = DateTime(
             baseDate.year,
             baseDate.month,
             baseDate.day,
@@ -1076,143 +991,72 @@ class _MedicineModalState extends State<MedicineModal> {
             _reminderTime!.minute,
           );
 
-          DateTime? adjustedStartDate = _reminderStartDate;
-
-          // If THIS specific interval has already passed today, start it tomorrow
-          if (intervalSpecificTime.isBefore(now) &&
-              intervalSpecificTime.year == now.year &&
-              intervalSpecificTime.month == now.month &&
-              intervalSpecificTime.day == now.day) {
-            intervalSpecificTime = intervalSpecificTime.add(
-              const Duration(days: 1),
-            );
-            if (adjustedStartDate != null) {
-              adjustedStartDate = adjustedStartDate.add(
-                const Duration(days: 1),
-              );
-            }
+          DateTime? adjustedStart = _reminderStartDate;
+          if (intervalTime.isBefore(now) && intervalTime.day == now.day) {
+            intervalTime = intervalTime.add(const Duration(days: 1));
+            adjustedStart = adjustedStart?.add(const Duration(days: 1));
           }
 
           recordsToSave.add(
             MedicineRecord(
               iconKey: _selectedIconKey,
               name: _selectedMedicines[i],
-              doseAmount: _doseAmountController.text.trim(),
-              frequency: frequencyText,
-              specificTime: intervalSpecificTime,
-              reminderStartDate: adjustedStartDate,
+              doseAmount: doseText,
+              frequency: freqText, // Used the new formatted text here
+              specificTime: intervalTime,
+              reminderStartDate: adjustedStart,
               reminderEndDate: _reminderEndDate,
               createdAt: createdAt.add(Duration(milliseconds: j)),
             ),
           );
         }
       }
-    }
 
-    setState(() {
-      _isSaving = true;
-    });
-
-    try {
       if (widget.initialMedicine == null) {
-        for (final MedicineRecord record in recordsToSave) {
-          await MedicineStorage.addMedicine(record);
-        }
+        await MedicineStorage.addMedicines(recordsToSave);
       } else {
         await MedicineStorage.updateMedicine(recordsToSave.first);
         if (recordsToSave.length > 1) {
-          for (final MedicineRecord record in recordsToSave.skip(1)) {
-            await MedicineStorage.addMedicine(record);
-          }
+          await MedicineStorage.addMedicines(recordsToSave.skip(1).toList());
         }
       }
-    } catch (_) {
-      if (mounted) {
-        setState(() {
-          _isSaving = false;
-        });
-        _showSnackBar('Unable to save medicine. Please try again.');
-      }
-      return;
-    }
 
-    if (hasReminderRange) {
-      try {
-        final bool hasAccess =
-            await NotificationService.ensureNotificationAccess();
-        if (!hasAccess) {
-          postSaveMessage =
-              'Medicine saved, but notifications are disabled in system settings.';
-        } else {
-          int totalScheduledCount = 0;
-          for (final MedicineRecord record in recordsToSave) {
-            final int scheduledCount =
-                await NotificationService.scheduleMedicineReminderRange(
-                  medicineCreatedAtMillis:
-                      record.createdAt.millisecondsSinceEpoch,
-                  medicineName: record.name,
-                  startDate:
-                      record.reminderStartDate!, // Use the adjusted start date
-                  endDate: record.reminderEndDate!,
-                  hour: record.specificTime!.hour,
-                  minute: record.specificTime!.minute,
-                  doseAmount: record.doseAmount,
-                );
-            totalScheduledCount += scheduledCount;
-          }
-          if (totalScheduledCount == 0 && postSaveMessage == null) {
-            postSaveMessage =
-                'Medicine saved, but no reminders were scheduled because the range has passed.';
-          }
-        }
-      } catch (_) {
-        postSaveMessage =
-            'Medicine saved, but reminder could not be scheduled. Check notification permission.';
-      }
-    } else {
-      try {
-        final bool hasAccess =
-            await NotificationService.ensureNotificationAccess();
-        if (!hasAccess) {
-          postSaveMessage =
-              'Medicine saved, but notifications are disabled in system settings.';
-        } else {
-          for (final MedicineRecord record in recordsToSave) {
-            if (record.specificTime != null) {
-              await NotificationService.scheduleMedicineReminder(
-                medicineCreatedAtMillis:
-                    record.createdAt.millisecondsSinceEpoch,
-                medicineName: record.name,
-                scheduledAt: DateTime(
-                  record.specificTime!.year,
-                  record.specificTime!.month,
-                  record.specificTime!.day,
-                  record.specificTime!.hour,
-                  record.specificTime!.minute,
-                ),
-                doseAmount: record.doseAmount,
-              );
-            }
-          }
-        }
-      } catch (_) {
-        postSaveMessage =
-            'Medicine saved, but reminder could not be scheduled. Check notification permission.';
+      _scheduleNotificationsInBackground(recordsToSave);
+      if (mounted) Navigator.pop(context, true);
+    } catch (e) {
+      _showSnackBar('Error saving: $e');
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  // Separate method to prevent UI blocking
+  Future<void> _scheduleNotificationsInBackground(
+    List<MedicineRecord> records,
+  ) async {
+    final bool hasAccess = await NotificationService.ensureNotificationAccess();
+    if (!hasAccess) return;
+
+    for (final record in records) {
+      if (record.reminderStartDate != null && record.reminderEndDate != null) {
+        await NotificationService.scheduleMedicineReminderRange(
+          medicineCreatedAtMillis: record.createdAt.millisecondsSinceEpoch,
+          medicineName: record.name,
+          startDate: record.reminderStartDate!,
+          endDate: record.reminderEndDate!,
+          hour: record.specificTime!.hour,
+          minute: record.specificTime!.minute,
+          doseAmount: record.doseAmount,
+        );
+      } else if (record.specificTime != null) {
+        await NotificationService.scheduleMedicineReminder(
+          medicineCreatedAtMillis: record.createdAt.millisecondsSinceEpoch,
+          medicineName: record.name,
+          scheduledAt: record.specificTime!,
+          doseAmount: record.doseAmount,
+        );
       }
     }
-
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _isSaving = false;
-    });
-
-    if (postSaveMessage != null) {
-      _showSnackBar(postSaveMessage);
-    }
-
-    Navigator.pop(context, true);
   }
 
   void _clearForm() {

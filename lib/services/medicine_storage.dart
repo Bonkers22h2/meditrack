@@ -123,4 +123,10 @@ class MedicineStorage {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.remove(_storageKey);
   }
+
+  static Future<void> addMedicines(List<MedicineRecord> newRecords) async {
+    final List<MedicineRecord> medicines = await loadMedicines();
+    medicines.addAll(newRecords);
+    await saveMedicines(medicines);
+  }
 }
