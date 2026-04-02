@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:meditrack/pages/patient_profile.dart';
 import 'package:meditrack/pages/stocks.dart';
 import 'package:meditrack/services/patient_storage.dart';
 
@@ -228,6 +229,15 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
     });
   }
 
+  Future<void> _openPatientProfile(PatientRecord patient) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (BuildContext context) =>
+            PatientProfileScreen(patient: patient),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final Widget currentTab = _selectedTabIndex == 0
@@ -417,7 +427,12 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
                           separatorBuilder: (_, __) =>
                               const SizedBox(height: 10),
                           itemBuilder: (BuildContext context, int index) {
-                            return _buildPatientCard(_patients[index]);
+                            final PatientRecord patient = _patients[index];
+                            return InkWell(
+                              borderRadius: BorderRadius.circular(16),
+                              onTap: () => _openPatientProfile(patient),
+                              child: _buildPatientCard(patient),
+                            );
                           },
                         ),
                 ),
