@@ -58,6 +58,7 @@ class _MedicineModalState extends State<MedicineModal> {
   List<String> _selectedMedicines = <String>[];
   List<String> _stockMedicineNames = <String>[];
   Map<String, int> _stockCountByMedicine = <String, int>{};
+  Map<String, String> _blockedStockReasonByMedicine = <String, String>{};
   bool _isLoadingStockNames = true;
 
   final Color modalBgColor = const Color(0xFFC0D1BD);
@@ -1073,6 +1074,21 @@ class _MedicineModalState extends State<MedicineModal> {
     if (name.isEmpty) {
       return;
     }
+
+    final String lowered = name.toLowerCase();
+    final String? blockedReason = _blockedStockReasonByMedicine.entries
+        .where(
+          (MapEntry<String, String> entry) =>
+              entry.key.toLowerCase() == lowered,
+        )
+        .map((MapEntry<String, String> entry) => entry.value)
+        .cast<String?>()
+        .firstWhere((String? reason) => reason != null, orElse: () => null);
+    if (blockedReason != null) {
+      _showSnackBar('Cannot add "$name": $blockedReason');
+      return;
+    }
+
     final bool exists = _selectedMedicines.any(
       (String item) => item.toLowerCase() == name.toLowerCase(),
     );
@@ -1208,19 +1224,52 @@ class _MedicineModalState extends State<MedicineModal> {
 
   Future<void> _loadMedicineNamesFromStocks() async {
     final List<StockRecord> stocks = await StockStorage.loadStocks();
-    final Map<String, int> stockCountByMedicine = <String, int>{};
+    final Map<String, int> totalStockByMedicine = <String, int>{};
+    final Map<String, int> validStockByMedicine = <String, int>{};
+    final Map<String, bool> hasExpiredBatchByMedicine = <String, bool>{};
+
     for (final StockRecord stock in stocks) {
       final String name = stock.medicineName.trim();
       if (name.isNotEmpty) {
-        stockCountByMedicine[name] =
-            (stockCountByMedicine[name] ?? 0) + stock.currentStock;
+        totalStockByMedicine[name] =
+            (totalStockByMedicine[name] ?? 0) + stock.currentStock;
+
+        if (stock.isExpired) {
+          hasExpiredBatchByMedicine[name] = true;
+          continue;
+        }
+
+        validStockByMedicine[name] =
+            (validStockByMedicine[name] ?? 0) + stock.currentStock;
       }
     }
-    final List<String> stockNames = stockCountByMedicine.keys.toList()..sort();
+
+    final Map<String, String> blockedReasons = <String, String>{};
+    for (final MapEntry<String, int> entry in totalStockByMedicine.entries) {
+      final String name = entry.key;
+      final int validStock = validStockByMedicine[name] ?? 0;
+      if (validStock <= 0) {
+        if (entry.value <= 0) {
+          blockedReasons[name] = 'stock is 0';
+        } else if (hasExpiredBatchByMedicine[name] == true) {
+          blockedReasons[name] = 'stock is expired';
+        } else {
+          blockedReasons[name] = 'no usable stock';
+        }
+      }
+    }
+
+    final List<String> stockNames =
+        validStockByMedicine.entries
+            .where((MapEntry<String, int> entry) => entry.value > 0)
+            .map((MapEntry<String, int> entry) => entry.key)
+            .toList()
+          ..sort();
+
     for (final String selected in _selectedMedicines) {
       if (!stockNames.contains(selected)) {
         stockNames.insert(0, selected);
-        stockCountByMedicine[selected] = stockCountByMedicine[selected] ?? 0;
+        validStockByMedicine[selected] = validStockByMedicine[selected] ?? 0;
       }
     }
     if (!mounted) {
@@ -1228,7 +1277,8 @@ class _MedicineModalState extends State<MedicineModal> {
     }
     setState(() {
       _stockMedicineNames = stockNames;
-      _stockCountByMedicine = stockCountByMedicine;
+      _stockCountByMedicine = validStockByMedicine;
+      _blockedStockReasonByMedicine = blockedReasons;
       _isLoadingStockNames = false;
     });
   }
