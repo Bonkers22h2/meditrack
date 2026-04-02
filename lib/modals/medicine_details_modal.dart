@@ -104,6 +104,15 @@ class _MedicineDetailsModalState extends State<MedicineDetailsModal> {
                     _buildInfoCard(
                       title: 'Schedule',
                       children: [
+                        _buildInfoRow('Pattern', _buildSchedulePatternText()),
+                        _buildInfoRow(
+                          'Interval',
+                          _buildIntervalText(widget.medicine.frequency),
+                        ),
+                        _buildInfoRow(
+                          'Selected days',
+                          _buildSelectedDaysText(widget.medicine.frequency),
+                        ),
                         _buildInfoRow(
                           'Date range',
                           _buildDateRangeText(
@@ -304,6 +313,53 @@ class _MedicineDetailsModalState extends State<MedicineDetailsModal> {
     ).format(context);
   }
 
+  String _buildSchedulePatternText() {
+    if (widget.medicine.reminderStartDate != null &&
+        widget.medicine.reminderEndDate != null) {
+      return 'Date range';
+    }
+    if (widget.medicine.reminderStartDate != null) {
+      return 'Recurring from start date';
+    }
+    if (widget.medicine.specificTime != null) {
+      return 'One-time reminder';
+    }
+    return 'Not set';
+  }
+
+  String _buildIntervalText(String frequency) {
+    final RegExp intervalRegex = RegExp(
+      r'^Every (\d+(?:\.\d+)?) hours(?: on .+)?$',
+      caseSensitive: false,
+    );
+    final Match? match = intervalRegex.firstMatch(frequency.trim());
+    if (match == null) {
+      return 'Not set';
+    }
+    final String rawHours = match.group(1)!;
+    final double? hours = double.tryParse(rawHours);
+    if (hours == null) {
+      return 'Every $rawHours hours';
+    }
+    if (hours == hours.toInt()) {
+      return 'Every ${hours.toInt()} hours';
+    }
+    return 'Every ${hours.toStringAsFixed(1)} hours';
+  }
+
+  String _buildSelectedDaysText(String frequency) {
+    final RegExp daysRegex = RegExp(
+      r'^Every \d+(?:\.\d+)? hours on (.+)$',
+      caseSensitive: false,
+    );
+    final Match? match = daysRegex.firstMatch(frequency.trim());
+    if (match == null) {
+      return 'All days';
+    }
+    final String days = (match.group(1) ?? '').trim();
+    return days.isEmpty ? 'All days' : days;
+  }
+
   String _displayValue(String value) {
     final String trimmed = value.trim();
     return trimmed.isEmpty ? 'Not set' : trimmed;
@@ -343,47 +399,42 @@ class _MedicineDetailsModalState extends State<MedicineDetailsModal> {
     final String trimmed = frequency.trim();
     if (trimmed.isEmpty) return 'Not set';
 
-    // Try to extract hours from "Every X hours" format
+    // Try to extract hours from "Every X hours" format (with optional day list)
     final RegExp everyHoursRegex = RegExp(
-      r'^Every (\d+(?:\.\d+)?) hours$',
+      r'^Every (\d+(?:\.\d+)?) hours(?: on (.+))?$',
       caseSensitive: false,
     );
     final Match? match = everyHoursRegex.firstMatch(trimmed);
 
     if (match != null) {
       final double hours = double.parse(match.group(1)!);
+      final String? days = match.group(2)?.trim();
+      final String daySuffix = (days == null || days.isEmpty)
+          ? ''
+          : ' on $days';
 
       if (hours == 24) {
-        return 'Once daily';
+        return 'Once daily$daySuffix';
       } else if (hours == 12) {
-        return 'Twice daily';
+        return 'Twice daily$daySuffix';
       } else if (hours == 8) {
-        return 'Three times daily';
+        return 'Three times daily$daySuffix';
       } else if (hours == 6) {
-        return 'Four times daily';
+        return 'Four times daily$daySuffix';
       } else if (hours == 4) {
-        return 'Every 4 hours';
+        return 'Every 4 hours$daySuffix';
       } else if (hours == 3) {
-        return 'Every 3 hours';
+        return 'Every 3 hours$daySuffix';
       } else if (hours == 2) {
-        return 'Every 2 hours';
+        return 'Every 2 hours$daySuffix';
       } else if (hours == 1) {
-        return 'Every hour';
+        return 'Every hour$daySuffix';
       } else if (hours == 48) {
-        return 'Every other day';
+        return 'Every other day$daySuffix';
       } else {
         // For custom intervals, keep the original format but clean it up
-        return 'Every ${hours.toStringAsFixed(hours == hours.toInt() ? 0 : 1)} hours';
+        return 'Every ${hours.toStringAsFixed(hours == hours.toInt() ? 0 : 1)} hours$daySuffix';
       }
-    }
-
-    // For weekly schedules like "Every 24 hours on Mon, Wed, Fri"
-    final RegExp weeklyRegex = RegExp(
-      r'^Every \d+(?:\.\d+)? hours on (.+)$',
-      caseSensitive: false,
-    );
-    if (weeklyRegex.hasMatch(trimmed)) {
-      return 'Weekly schedule';
     }
 
     // Return original if no pattern matches
