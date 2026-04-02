@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:meditrack/pages/stocks.dart';
 import 'package:meditrack/services/patient_storage.dart';
 
 class CaregiverDashboardScreen extends StatefulWidget {
@@ -10,6 +11,7 @@ class CaregiverDashboardScreen extends StatefulWidget {
 }
 
 class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
+  int _selectedTabIndex = 0;
   List<PatientRecord> _patients = <PatientRecord>[];
   bool _isLoading = true;
 
@@ -228,201 +230,225 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: backgroundColor,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  SizedBox(
-                    height: 40,
-                    child: Image.asset(
-                      'android/app/src/main/res/assets/icons (1).png',
-                      fit: BoxFit.contain,
+    final Widget currentTab = _selectedTabIndex == 0
+        ? Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    SizedBox(
+                      height: 40,
+                      child: Image.asset(
+                        'android/app/src/main/res/assets/icons (1).png',
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: cardColor,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.03),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: IconButton(
+                            tooltip: 'Help Center',
+                            icon: Icon(
+                              Icons.help_outline,
+                              color: textLight,
+                              size: 24,
+                            ),
+                            onPressed: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Caregiver help center is coming soon.',
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: cardColor,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.03),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: IconButton(
+                            tooltip: 'Caregiver options',
+                            icon: Icon(
+                              Icons.settings_outlined,
+                              color: textLight,
+                              size: 24,
+                            ),
+                            onPressed: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Caregiver settings will be added soon.',
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  'Caregiver Dashboard',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w600,
+                    color: textDark,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Monitor patients and quickly add people you care for.',
+                  style: TextStyle(
+                    color: textFaint,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _showAddPatientDialog,
+                    icon: const Icon(Icons.person_add_alt_1_rounded),
+                    label: const Text('Add Patient'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: actionColor,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18),
+                      ),
                     ),
                   ),
-                  Row(
-                    children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: cardColor,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.03),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: IconButton(
-                          tooltip: 'Help Center',
-                          icon: Icon(
-                            Icons.help_outline,
-                            color: textLight,
-                            size: 24,
-                          ),
-                          onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Caregiver help center is coming soon.',
-                                ),
-                              ),
-                            );
-                          },
-                        ),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                  decoration: BoxDecoration(
+                    color: cardColor,
+                    borderRadius: BorderRadius.circular(18),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.04),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
                       ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.people_outline, color: textDark),
                       const SizedBox(width: 10),
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: cardColor,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.03),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: IconButton(
-                          tooltip: 'Caregiver options',
-                          icon: Icon(
-                            Icons.settings_outlined,
-                            color: textLight,
-                            size: 24,
-                          ),
-                          onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Caregiver settings will be added soon.',
-                                ),
-                              ),
-                            );
-                          },
+                      Text(
+                        '${_patients.length} patient${_patients.length == 1 ? '' : 's'} under care',
+                        style: TextStyle(
+                          color: textDark,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ],
                   ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'Caregiver Dashboard',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w600,
-                  color: textDark,
-                  letterSpacing: -0.5,
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Monitor patients and quickly add people you care for.',
-                style: TextStyle(
-                  color: textFaint,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 18),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: _showAddPatientDialog,
-                  icon: const Icon(Icons.person_add_alt_1_rounded),
-                  label: const Text('Add Patient'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: actionColor,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18),
-                    ),
+                const SizedBox(height: 16),
+                Text(
+                  'Patients',
+                  style: TextStyle(
+                    color: textDark,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 14,
-                ),
-                decoration: BoxDecoration(
-                  color: cardColor,
-                  borderRadius: BorderRadius.circular(18),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.04),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.people_outline, color: textDark),
-                    const SizedBox(width: 10),
-                    Text(
-                      '${_patients.length} patient${_patients.length == 1 ? '' : 's'} under care',
-                      style: TextStyle(
-                        color: textDark,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Patients',
-                style: TextStyle(
-                  color: textDark,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Expanded(
-                child: _isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : _patients.isEmpty
-                    ? Center(
-                        child: Text(
-                          'No patients yet. Tap Add Patient to begin.',
-                          style: TextStyle(
-                            color: textFaint,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
+                const SizedBox(height: 10),
+                Expanded(
+                  child: _isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : _patients.isEmpty
+                      ? Center(
+                          child: Text(
+                            'No patients yet. Tap Add Patient to begin.',
+                            style: TextStyle(
+                              color: textFaint,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
+                        )
+                      : ListView.separated(
+                          itemCount: _patients.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 10),
+                          itemBuilder: (BuildContext context, int index) {
+                            return _buildPatientCard(_patients[index]);
+                          },
                         ),
-                      )
-                    : ListView.separated(
-                        itemCount: _patients.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 10),
-                        itemBuilder: (BuildContext context, int index) {
-                          return _buildPatientCard(_patients[index]);
-                        },
-                      ),
-              ),
-            ],
+                ),
+              ],
+            ),
+          )
+        : const StockScreen();
+
+    return Scaffold(
+      backgroundColor: backgroundColor,
+      body: SafeArea(child: currentTab),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedTabIndex,
+        onTap: (int index) {
+          setState(() {
+            _selectedTabIndex = index;
+          });
+        },
+        backgroundColor: cardColor,
+        selectedItemColor: textDark,
+        unselectedItemColor: textFaint,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home_outlined),
+            label: 'Home',
           ),
-        ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.inventory_2_outlined),
+            label: 'Stocks',
+          ),
+        ],
       ),
     );
   }
