@@ -991,12 +991,6 @@ class _MedicineModalState extends State<MedicineModal> {
             _reminderTime!.minute,
           );
 
-          DateTime? adjustedStart = _reminderStartDate;
-          if (intervalTime.isBefore(now) && intervalTime.day == now.day) {
-            intervalTime = intervalTime.add(const Duration(days: 1));
-            adjustedStart = adjustedStart?.add(const Duration(days: 1));
-          }
-
           recordsToSave.add(
             MedicineRecord(
               iconKey: _selectedIconKey,
@@ -1004,7 +998,7 @@ class _MedicineModalState extends State<MedicineModal> {
               doseAmount: doseText,
               frequency: freqText, // Used the new formatted text here
               specificTime: intervalTime,
-              reminderStartDate: adjustedStart,
+              reminderStartDate: _reminderStartDate,
               reminderEndDate: _reminderEndDate,
               createdAt: createdAt.add(Duration(milliseconds: j)),
             ),

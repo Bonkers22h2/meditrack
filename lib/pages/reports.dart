@@ -194,26 +194,34 @@ class _ReportsScreenState extends State<ReportsScreen> {
     DateTime date,
   ) {
     final List<_ReminderOccurrence> result = <_ReminderOccurrence>[];
+    final DateTime day = DateTime(date.year, date.month, date.day);
     for (final MedicineRecord medicine in medicines) {
       if (medicine.specificTime == null) {
         continue;
       }
 
-      if (medicine.reminderStartDate != null &&
-          medicine.reminderEndDate != null) {
-        final DateTime start = DateTime(
-          medicine.reminderStartDate!.year,
-          medicine.reminderStartDate!.month,
-          medicine.reminderStartDate!.day,
-        );
-        final DateTime end = DateTime(
-          medicine.reminderEndDate!.year,
-          medicine.reminderEndDate!.month,
-          medicine.reminderEndDate!.day,
-        );
-        final DateTime day = DateTime(date.year, date.month, date.day);
+      if (!_isScheduledOnWeekday(medicine.frequency, day)) {
+        continue;
+      }
 
-        if (!day.isBefore(start) && !day.isAfter(end)) {
+      final DateTime? start = medicine.reminderStartDate == null
+          ? null
+          : DateTime(
+              medicine.reminderStartDate!.year,
+              medicine.reminderStartDate!.month,
+              medicine.reminderStartDate!.day,
+            );
+      final DateTime? end = medicine.reminderEndDate == null
+          ? null
+          : DateTime(
+              medicine.reminderEndDate!.year,
+              medicine.reminderEndDate!.month,
+              medicine.reminderEndDate!.day,
+            );
+
+      if (start != null || end != null) {
+        if ((start == null || !day.isBefore(start)) &&
+            (end == null || !day.isAfter(end))) {
           result.add(
             _ReminderOccurrence(
               medicine: medicine,
@@ -245,6 +253,44 @@ class _ReportsScreenState extends State<ReportsScreen> {
       }
     }
     return result;
+  }
+
+  bool _isScheduledOnWeekday(String frequency, DateTime day) {
+    final RegExp onDaysRegex = RegExp(
+      r'^Every \d+(?:\.\d+)? hours on (.+)$',
+      caseSensitive: false,
+    );
+    final Match? match = onDaysRegex.firstMatch(frequency.trim());
+    if (match == null) {
+      return true;
+    }
+
+    final String daysPart = (match.group(1) ?? '').trim();
+    if (daysPart.isEmpty) {
+      return true;
+    }
+
+    const Map<String, int> weekdayMap = <String, int>{
+      'Mon': DateTime.monday,
+      'Tue': DateTime.tuesday,
+      'Wed': DateTime.wednesday,
+      'Thu': DateTime.thursday,
+      'Fri': DateTime.friday,
+      'Sat': DateTime.saturday,
+      'Sun': DateTime.sunday,
+    };
+
+    final Set<int> allowedWeekdays = daysPart
+        .split(',')
+        .map((String raw) => raw.trim())
+        .map((String label) => weekdayMap[label])
+        .whereType<int>()
+        .toSet();
+
+    if (allowedWeekdays.isEmpty) {
+      return true;
+    }
+    return allowedWeekdays.contains(day.weekday);
   }
 
   String _dateStorageKey(DateTime date) {

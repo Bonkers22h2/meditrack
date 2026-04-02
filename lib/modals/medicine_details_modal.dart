@@ -454,6 +454,11 @@ class _MedicineDetailsModalState extends State<MedicineDetailsModal> {
                 minute: widget.medicine.specificTime!.minute,
               )
             : null,
+      ).timeout(
+        const Duration(seconds: 5),
+        onTimeout: () {
+          // Don't block deletion if notification cleanup is slow.
+        },
       );
 
       // THEN: Delete from storage

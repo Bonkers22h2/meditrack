@@ -896,27 +896,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
       // Skip medicines without time info
       if (medicine.specificTime == null) continue;
 
-      // Handle Range-Based Meds (with start/end dates)
-      if (medicine.reminderStartDate != null &&
-          medicine.reminderEndDate != null) {
-        // Normalize start/end to date-only (midnight)
-        final DateTime startOnly = DateTime(
-          medicine.reminderStartDate!.year,
-          medicine.reminderStartDate!.month,
-          medicine.reminderStartDate!.day,
-        );
-        final DateTime endOnly = DateTime(
-          medicine.reminderEndDate!.year,
-          medicine.reminderEndDate!.month,
-          medicine.reminderEndDate!.day,
-        );
+      // Respect selected weekdays from frequency text (e.g. "on Sun, Tue").
+      if (!_isScheduledOnWeekday(medicine.frequency, selectedDateOnly)) {
+        continue;
+      }
 
+      final DateTime? startOnly = medicine.reminderStartDate == null
+          ? null
+          : DateTime(
+              medicine.reminderStartDate!.year,
+              medicine.reminderStartDate!.month,
+              medicine.reminderStartDate!.day,
+            );
+      final DateTime? endOnly = medicine.reminderEndDate == null
+          ? null
+          : DateTime(
+              medicine.reminderEndDate!.year,
+              medicine.reminderEndDate!.month,
+              medicine.reminderEndDate!.day,
+            );
+
+      // Handle Range-Based Meds (with start/end dates)
+      if (startOnly != null || endOnly != null) {
         // ⚠️ CRITICAL FIX: DO NOT create reminders before start date
-        if (selectedDateOnly.isBefore(startOnly)) {
+        if (startOnly != null && selectedDateOnly.isBefore(startOnly)) {
           continue;
         }
         // Filter OUT: Medicines that have ended
-        if (selectedDateOnly.isAfter(endOnly)) {
+        if (endOnly != null && selectedDateOnly.isAfter(endOnly)) {
           continue;
         }
 
@@ -958,6 +965,44 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   bool _isSameDay(DateTime a, DateTime b) {
     return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  bool _isScheduledOnWeekday(String frequency, DateTime day) {
+    final RegExp onDaysRegex = RegExp(
+      r'^Every \d+(?:\.\d+)? hours on (.+)$',
+      caseSensitive: false,
+    );
+    final Match? match = onDaysRegex.firstMatch(frequency.trim());
+    if (match == null) {
+      return true;
+    }
+
+    final String daysPart = (match.group(1) ?? '').trim();
+    if (daysPart.isEmpty) {
+      return true;
+    }
+
+    const Map<String, int> weekdayMap = <String, int>{
+      'Mon': DateTime.monday,
+      'Tue': DateTime.tuesday,
+      'Wed': DateTime.wednesday,
+      'Thu': DateTime.thursday,
+      'Fri': DateTime.friday,
+      'Sat': DateTime.saturday,
+      'Sun': DateTime.sunday,
+    };
+
+    final Set<int> allowedWeekdays = daysPart
+        .split(',')
+        .map((String raw) => raw.trim())
+        .map((String label) => weekdayMap[label])
+        .whereType<int>()
+        .toSet();
+
+    if (allowedWeekdays.isEmpty) {
+      return true;
+    }
+    return allowedWeekdays.contains(day.weekday);
   }
 
   // FIXED: Uses normalization to ensure accurate Today/Yesterday labels
