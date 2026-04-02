@@ -14,10 +14,12 @@ class MedicineModal extends StatefulWidget {
   const MedicineModal({
     super.key,
     this.initialMedicine,
+    this.patientId,
     this.startScheduleTutorial = false,
   });
 
   final MedicineRecord? initialMedicine;
+  final String? patientId;
   final bool startScheduleTutorial;
 
   @override
@@ -995,6 +997,7 @@ class _MedicineModalState extends State<MedicineModal> {
           recordsToSave.add(
             MedicineRecord(
               iconKey: _selectedIconKey,
+              patientId: widget.patientId ?? widget.initialMedicine?.patientId,
               name: _selectedMedicines[i],
               doseAmount: doseText,
               frequency: freqText, // Used the new formatted text here

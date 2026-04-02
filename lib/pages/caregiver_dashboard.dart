@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:meditrack/pages/patient_profile.dart';
 import 'package:meditrack/pages/stocks.dart';
+import 'package:meditrack/services/medicine_storage.dart';
 import 'package:meditrack/services/patient_storage.dart';
 
 class CaregiverDashboardScreen extends StatefulWidget {
@@ -14,6 +15,7 @@ class CaregiverDashboardScreen extends StatefulWidget {
 class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
   int _selectedTabIndex = 0;
   List<PatientRecord> _patients = <PatientRecord>[];
+  Map<String, int> _reminderCountByPatientId = <String, int>{};
   bool _isLoading = true;
 
   final Color backgroundColor = const Color(0xFFF4F5F0);
@@ -53,7 +55,18 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
   @override
   void initState() {
     super.initState();
-    _loadPatients();
+    _loadDashboardData();
+  }
+
+  String _patientIdFor(PatientRecord patient) {
+    return patient.createdAt.toIso8601String();
+  }
+
+  Future<void> _loadDashboardData() async {
+    await Future.wait<void>(<Future<void>>[
+      _loadPatients(),
+      _loadReminderCounts(),
+    ]);
   }
 
   Future<void> _loadPatients() async {
@@ -64,6 +77,28 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
     setState(() {
       _patients = patients;
       _isLoading = false;
+    });
+  }
+
+  Future<void> _loadReminderCounts() async {
+    final List<MedicineRecord> allRecords =
+        await MedicineStorage.loadMedicines();
+    final Map<String, int> counts = <String, int>{};
+
+    for (final MedicineRecord record in allRecords) {
+      final String? patientId = record.patientId;
+      if (patientId == null || patientId.isEmpty) {
+        continue;
+      }
+      counts[patientId] = (counts[patientId] ?? 0) + 1;
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _reminderCountByPatientId = counts;
     });
   }
 
@@ -236,6 +271,11 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
             PatientProfileScreen(patient: patient),
       ),
     );
+
+    if (!mounted) {
+      return;
+    }
+    await _loadReminderCounts();
   }
 
   @override
@@ -469,6 +509,9 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
   }
 
   Widget _buildPatientCard(PatientRecord patient) {
+    final String patientId = _patientIdFor(patient);
+    final int reminderCount = _reminderCountByPatientId[patientId] ?? 0;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
@@ -484,7 +527,6 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
         ],
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
         children: [
           Container(
             width: 38,
@@ -539,6 +581,24 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
               ),
             ),
           ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE7EFE4),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              '$reminderCount reminder${reminderCount == 1 ? '' : 's'}',
+              style: TextStyle(
+                color: textDark,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const Spacer(),
+          Icon(Icons.chevron_right_rounded, color: textLight, size: 22),
         ],
       ),
     );

@@ -8,6 +8,7 @@ import 'package:meditrack/services/medicine_icons.dart';
 class MedicineRecord {
   MedicineRecord({
     this.iconKey = MedicineIcons.defaultIconKey,
+    this.patientId,
     required this.name,
     required this.doseAmount,
     required this.frequency,
@@ -18,6 +19,7 @@ class MedicineRecord {
   });
 
   final String iconKey;
+  final String? patientId;
   final String name;
   final String doseAmount;
   final String frequency;
@@ -29,6 +31,7 @@ class MedicineRecord {
   factory MedicineRecord.fromJson(Map<String, dynamic> json) {
     return MedicineRecord(
       iconKey: (json['iconKey'] as String?) ?? MedicineIcons.defaultIconKey,
+      patientId: json['patientId'] as String?,
       name: (json['name'] as String?) ?? '',
       doseAmount: (json['doseAmount'] as String?) ?? '',
       frequency: (json['frequency'] as String?) ?? '',
@@ -45,6 +48,7 @@ class MedicineRecord {
   Map<String, dynamic> toJson() {
     return <String, dynamic>{
       'iconKey': iconKey,
+      'patientId': patientId,
       'name': name,
       'doseAmount': doseAmount,
       'frequency': frequency,

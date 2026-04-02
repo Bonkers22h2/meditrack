@@ -176,7 +176,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _loadMedicines() async {
     final List<MedicineRecord> medicines =
-        await MedicineStorage.loadMedicines();
+        (await MedicineStorage.loadMedicines())
+            .where((MedicineRecord record) => record.patientId == null)
+            .toList();
     if (!mounted) {
       return;
     }
