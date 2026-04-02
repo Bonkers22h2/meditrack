@@ -1,5 +1,6 @@
 // main.dart
 import 'package:flutter/material.dart';
+import 'package:meditrack/pages/caregiver_dashboard.dart';
 import 'package:meditrack/pages/dashboard.dart';
 import 'package:meditrack/services/notification_service.dart';
 import 'package:meditrack/tutorials/main_tutorial.dart';
@@ -401,18 +402,6 @@ class _MeditrackLoginScreenState extends State<MeditrackLoginScreen> {
           ),
         ),
       ),
-    );
-  }
-}
-
-class CaregiverDashboardScreen extends StatelessWidget {
-  const CaregiverDashboardScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Caregiver Dashboard')),
-      body: const SafeArea(child: SizedBox.expand()),
     );
   }
 }
