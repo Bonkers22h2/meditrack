@@ -5,15 +5,24 @@ import 'package:meditrack/services/medicine_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ReportsScreen extends StatefulWidget {
-  const ReportsScreen({super.key});
+  const ReportsScreen({
+    super.key,
+    this.patientId,
+    this.patientLabel,
+    this.takenRemindersStorageKey = 'taken_reminders_v1',
+    this.title = 'Adherence Report',
+  });
+
+  final String? patientId;
+  final String? patientLabel;
+  final String takenRemindersStorageKey;
+  final String title;
 
   @override
   State<ReportsScreen> createState() => _ReportsScreenState();
 }
 
 class _ReportsScreenState extends State<ReportsScreen> {
-  static const String _takenRemindersStorageKey = 'taken_reminders_v1';
-
   int _selectedRangeIndex = 0;
   bool _isLoading = true;
   _ReportSummary _summary = _ReportSummary.empty();
@@ -30,6 +39,15 @@ class _ReportsScreenState extends State<ReportsScreen> {
     _loadReportData();
   }
 
+  @override
+  void didUpdateWidget(covariant ReportsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.patientId != widget.patientId ||
+        oldWidget.takenRemindersStorageKey != widget.takenRemindersStorageKey) {
+      _loadReportData();
+    }
+  }
+
   Future<void> _loadReportData() async {
     setState(() {
       _isLoading = true;
@@ -39,12 +57,21 @@ class _ReportsScreenState extends State<ReportsScreen> {
     final List<MedicineRecord> medicines =
         await MedicineStorage.loadMedicines();
     final Set<String> takenReminderKeys =
-        (prefs.getStringList(_takenRemindersStorageKey) ?? <String>[]).toSet();
+        (prefs.getStringList(widget.takenRemindersStorageKey) ?? <String>[])
+            .toSet();
+
+    final List<MedicineRecord> filteredMedicines = medicines
+        .where(
+          (MedicineRecord record) => widget.patientId == null
+              ? record.patientId == null
+              : record.patientId == widget.patientId,
+        )
+        .toList();
 
     final DateTime now = DateTime.now();
     final DateTimeRange range = _selectedDateRange(now);
     final _ReportSummary summary = _buildSummary(
-      medicines: medicines,
+      medicines: filteredMedicines,
       takenReminderKeys: takenReminderKeys,
       range: range,
       now: now,
@@ -411,7 +438,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 ),
                 const SizedBox(height: 26),
                 Text(
-                  'Adherence Report',
+                  widget.title,
                   style: TextStyle(
                     fontSize: 54 / 2,
                     fontWeight: FontWeight.w500,
@@ -419,6 +446,17 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     letterSpacing: -0.3,
                   ),
                 ),
+                if (widget.patientLabel != null) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    widget.patientLabel!,
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: textLight,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 18),
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,

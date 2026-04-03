@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:meditrack/pages/patient_profile.dart';
+import 'package:meditrack/pages/reports.dart';
 import 'package:meditrack/pages/stocks.dart';
 import 'package:meditrack/services/medicine_storage.dart';
 import 'package:meditrack/services/patient_storage.dart';
@@ -16,6 +17,7 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
   int _selectedTabIndex = 0;
   List<PatientRecord> _patients = <PatientRecord>[];
   Map<String, int> _reminderCountByPatientId = <String, int>{};
+  String? _selectedPatientId;
   bool _isLoading = true;
 
   final Color backgroundColor = const Color(0xFFF4F5F0);
@@ -76,6 +78,15 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
     }
     setState(() {
       _patients = patients;
+      if (_selectedPatientId == null ||
+          !_patients.any(
+            (PatientRecord patient) =>
+                _patientIdFor(patient) == _selectedPatientId,
+          )) {
+        _selectedPatientId = patients.isNotEmpty
+            ? _patientIdFor(patients.first)
+            : null;
+      }
       _isLoading = false;
     });
   }
@@ -276,6 +287,20 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
       return;
     }
     await _loadReminderCounts();
+  }
+
+  String? _selectedPatientName() {
+    if (_selectedPatientId == null) {
+      return null;
+    }
+
+    for (final PatientRecord patient in _patients) {
+      if (_patientIdFor(patient) == _selectedPatientId) {
+        return patient.fullName;
+      }
+    }
+
+    return null;
   }
 
   @override
@@ -479,7 +504,9 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
               ],
             ),
           )
-        : const StockScreen();
+        : _selectedTabIndex == 1
+        ? const StockScreen()
+        : _buildReportsTab();
 
     return Scaffold(
       backgroundColor: backgroundColor,
@@ -502,6 +529,106 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
           BottomNavigationBarItem(
             icon: Icon(Icons.inventory_2_outlined),
             label: 'Stocks',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.insert_chart_outlined),
+            label: 'Reports',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReportsTab() {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_patients.isEmpty || _selectedPatientId == null) {
+      return Center(
+        child: Text(
+          'Add a patient to view caregiver reports.',
+          style: TextStyle(
+            color: textFaint,
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      );
+    }
+
+    final String? selectedPatientName = _selectedPatientName();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 12),
+          Text(
+            'Caregiver Reports',
+            style: TextStyle(
+              color: textDark,
+              fontSize: 24,
+              fontWeight: FontWeight.w600,
+              letterSpacing: -0.4,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Switch between patients to review adherence and missed doses.',
+            style: TextStyle(
+              color: textFaint,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: cardColor,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButtonFormField<String>(
+                value: _selectedPatientId,
+                decoration: const InputDecoration(border: InputBorder.none),
+                items: _patients
+                    .map(
+                      (PatientRecord patient) => DropdownMenuItem<String>(
+                        value: _patientIdFor(patient),
+                        child: Text(patient.fullName),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (String? value) {
+                  if (value == null) {
+                    return;
+                  }
+                  setState(() {
+                    _selectedPatientId = value;
+                  });
+                },
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: ReportsScreen(
+              key: ValueKey<String?>(_selectedPatientId),
+              patientId: _selectedPatientId,
+              patientLabel: selectedPatientName,
+              takenRemindersStorageKey: 'patient_taken_reminders_v1',
+              title: 'Adherence Report',
+            ),
           ),
         ],
       ),
