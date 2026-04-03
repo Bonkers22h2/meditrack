@@ -5,6 +5,7 @@ import 'package:meditrack/services/medicine_icons.dart';
 import 'package:meditrack/services/medicine_storage.dart';
 import 'package:meditrack/services/notification_service.dart';
 import 'package:meditrack/services/patient_storage.dart';
+import 'package:meditrack/services/stock_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class PatientProfileScreen extends StatefulWidget {
@@ -18,9 +19,12 @@ class PatientProfileScreen extends StatefulWidget {
 
 class _PatientProfileScreenState extends State<PatientProfileScreen> {
   static const String _takenRemindersStorageKey = 'patient_taken_reminders_v1';
+  static const String _deductedRemindersStorageKey =
+      'patient_deducted_reminders_v1';
 
   List<MedicineRecord> _reminders = <MedicineRecord>[];
   Set<String> _takenReminderKeys = <String>{};
+  Set<String> _deductedReminderKeys = <String>{};
   bool _isLoadingReminders = true;
   DateTime _selectedDate = DateTime.now();
 
@@ -85,6 +89,8 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     final List<String> taken =
         prefs.getStringList(_takenRemindersStorageKey) ?? <String>[];
+    final List<String> deducted =
+        prefs.getStringList(_deductedRemindersStorageKey) ?? <String>[];
 
     if (!mounted) {
       return;
@@ -92,6 +98,7 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
 
     setState(() {
       _takenReminderKeys = taken.toSet();
+      _deductedReminderKeys = deducted.toSet();
     });
   }
 
@@ -101,6 +108,18 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
       _takenRemindersStorageKey,
       _takenReminderKeys.toList(),
     );
+    await prefs.setStringList(
+      _deductedRemindersStorageKey,
+      _deductedReminderKeys.toList(),
+    );
+  }
+
+  int _extractDoseCount(String doseAmount) {
+    final RegExpMatch? match = RegExp(r'\d+').firstMatch(doseAmount);
+    if (match == null) {
+      return 1;
+    }
+    return int.tryParse(match.group(0)!) ?? 1;
   }
 
   Future<void> _markReminderAsTaken(MedicineRecord reminder) async {
@@ -136,6 +155,25 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
       medicineCreatedAtMillis: reminder.createdAt.millisecondsSinceEpoch,
       scheduledAt: scheduledAt,
     ).catchError((_) {});
+
+    final int doseCount = _extractDoseCount(reminder.doseAmount);
+    if (!_deductedReminderKeys.contains(reminderKey)) {
+      final bool deducted = await StockStorage.deductStockForMedicine(
+        medicineName: reminder.name,
+        amount: doseCount,
+      );
+      if (deducted) {
+        if (mounted) {
+          setState(() {
+            _deductedReminderKeys.add(reminderKey);
+          });
+        } else {
+          _deductedReminderKeys.add(reminderKey);
+        }
+      }
+    }
+
+    await _persistReminderCompletionState();
   }
 
   Future<void> _openReminderDetails(MedicineRecord reminder) async {
