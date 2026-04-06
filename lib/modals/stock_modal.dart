@@ -14,7 +14,7 @@ class StockEditModal extends StatefulWidget {
   const StockEditModal({
     super.key,
     this.initialRecord,
-    this.initialMedicineName = 'Medicine 2',
+    this.initialMedicineName = '',
     this.initialStock = 7,
     this.lowStockThreshold = 4,
     this.initialExpiryDate,
@@ -330,7 +330,7 @@ class _StockEditModalState extends State<StockEditModal> {
                 autofocus: false,
                 textAlign: TextAlign.center,
                 decoration: InputDecoration(
-                  hintText: 'Medicine name',
+                  hintText: 'e.g., Paracetamol 500mg',
                   border: InputBorder.none,
                   hintStyle: TextStyle(
                     fontSize: 28,
