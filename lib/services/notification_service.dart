@@ -81,21 +81,26 @@ class NotificationService {
     required int medicineCreatedAtMillis,
     required String medicineName,
     required DateTime scheduledAt,
+    String? patientName,
     String? doseAmount,
   }) async {
     if (!_initialized) {
       await initialize();
     }
 
-    final tz.TZDateTime scheduledDate = tz.TZDateTime.from(
-      scheduledAt,
-      tz.local,
+    final tz.TZDateTime? scheduledDate = _coerceToFutureSchedule(
+      tz.TZDateTime.from(scheduledAt, tz.local),
     );
+
+    if (scheduledDate == null) {
+      return;
+    }
 
     await _scheduleEscalatingReminder(
       medicineCreatedAtMillis: medicineCreatedAtMillis,
       scheduledDate: scheduledDate,
       medicineName: medicineName,
+      patientName: patientName,
       doseAmount: doseAmount,
     );
   }
@@ -107,6 +112,8 @@ class NotificationService {
     required DateTime endDate,
     required int hour,
     required int minute,
+    String? frequency,
+    String? patientName,
     String? doseAmount,
   }) async {
     if (!_initialized) {
@@ -128,6 +135,10 @@ class NotificationService {
       return 0;
     }
 
+    final Set<int>? allowedWeekdays = _parseAllowedWeekdaysFromFrequency(
+      frequency,
+    );
+
     DateTime cursor = normalizedStart;
     final DateTime now = DateTime.now();
     int scheduledCount = 0;
@@ -143,15 +154,25 @@ class NotificationService {
         minute,
       );
 
-      if (scheduledAt.isAfter(now)) {
-        final tz.TZDateTime scheduledDate = tz.TZDateTime.from(
-          scheduledAt,
-          tz.local,
+      final bool weekdayAllowed =
+          allowedWeekdays == null ||
+          allowedWeekdays.contains(scheduledAt.weekday);
+
+      if (weekdayAllowed) {
+        final tz.TZDateTime? scheduledDate = _coerceToFutureSchedule(
+          tz.TZDateTime.from(scheduledAt, tz.local),
+          now: tz.TZDateTime.from(now, tz.local),
         );
+        if (scheduledDate == null) {
+          idOffset += 1;
+          cursor = cursor.add(const Duration(days: 1));
+          continue;
+        }
         await _scheduleEscalatingReminder(
           medicineCreatedAtMillis: medicineCreatedAtMillis,
           scheduledDate: scheduledDate,
           medicineName: medicineName,
+          patientName: patientName,
           doseAmount: doseAmount,
         );
         scheduledCount += 1;
@@ -162,6 +183,87 @@ class NotificationService {
     }
 
     return scheduledCount;
+  }
+
+  static Set<int>? _parseAllowedWeekdaysFromFrequency(String? frequency) {
+    if (frequency == null || frequency.trim().isEmpty) {
+      return null;
+    }
+
+    final RegExp onDaysRegex = RegExp(
+      r'^Every \d+(?:\.\d+)? hours on (.+)$',
+      caseSensitive: false,
+    );
+    final Match? match = onDaysRegex.firstMatch(frequency.trim());
+    if (match == null) {
+      return null;
+    }
+
+    final String daysText = (match.group(1) ?? '').trim();
+    if (daysText.isEmpty) {
+      return null;
+    }
+
+    const Map<String, int> weekdayByToken = <String, int>{
+      'mon': DateTime.monday,
+      'monday': DateTime.monday,
+      'tue': DateTime.tuesday,
+      'tues': DateTime.tuesday,
+      'tuesday': DateTime.tuesday,
+      'wed': DateTime.wednesday,
+      'wednesday': DateTime.wednesday,
+      'thu': DateTime.thursday,
+      'thur': DateTime.thursday,
+      'thurs': DateTime.thursday,
+      'thursday': DateTime.thursday,
+      'fri': DateTime.friday,
+      'friday': DateTime.friday,
+      'sat': DateTime.saturday,
+      'saturday': DateTime.saturday,
+      'sun': DateTime.sunday,
+      'sunday': DateTime.sunday,
+    };
+
+    final Set<int> allowedWeekdays = daysText
+        .split(',')
+        .map(
+          (String token) => token
+              .trim()
+              .toLowerCase()
+              .replaceAll('.', '')
+              .replaceAll(';', ''),
+        )
+        .map((String token) => weekdayByToken[token])
+        .whereType<int>()
+        .toSet();
+
+    if (allowedWeekdays.isEmpty) {
+      return null;
+    }
+
+    return allowedWeekdays;
+  }
+
+  static tz.TZDateTime? _coerceToFutureSchedule(
+    tz.TZDateTime scheduledDate, {
+    tz.TZDateTime? now,
+  }) {
+    final tz.TZDateTime current = now ?? tz.TZDateTime.now(tz.local);
+
+    // If already in the future, keep it unchanged.
+    if (scheduledDate.isAfter(current)) {
+      return scheduledDate;
+    }
+
+    final Duration lag = current.difference(scheduledDate);
+
+    // Guard against minute-level race conditions while saving reminders.
+    if (lag <= const Duration(minutes: 1)) {
+      return current.add(const Duration(seconds: 5));
+    }
+
+    // Old past reminders should not be rescheduled automatically.
+    return null;
   }
 
   static Future<void> showInstantTestNotification({
@@ -336,6 +438,7 @@ class NotificationService {
     required int medicineCreatedAtMillis,
     required tz.TZDateTime scheduledDate,
     required String medicineName,
+    String? patientName,
     String? doseAmount,
   }) async {
     final String reminderIdentity = _buildReminderIdentity(
@@ -348,6 +451,7 @@ class NotificationService {
       final _NotificationContent content = _notificationContentForAttempt(
         attempt: attempt,
         medicineName: medicineName,
+        patientName: patientName,
         doseAmount: doseAmount,
         scheduledDate: scheduledDate,
       );
@@ -593,6 +697,7 @@ class NotificationService {
   static _NotificationContent _notificationContentForAttempt({
     required int attempt,
     required String medicineName,
+    String? patientName,
     String? doseAmount,
     required tz.TZDateTime scheduledDate,
   }) {
@@ -601,13 +706,17 @@ class NotificationService {
     final String doseText = trimmedDose.isEmpty
         ? 'Dose: as prescribed.'
         : 'Dose: $trimmedDose.';
+    final String normalizedPatientName = (patientName ?? '').trim();
+    final String patientText = normalizedPatientName.isEmpty
+        ? ''
+        : 'Patient: $normalizedPatientName. ';
     final String scheduledTime = _formatClockTime(scheduledDate);
 
     if (alertLevel == 1) {
       return _NotificationContent(
         title: 'Reminder: $medicineName',
         body:
-            'Scheduled for $scheduledTime. $doseText Please take it now and mark it as taken in MediTrack.',
+            '${patientText}Scheduled for $scheduledTime. $doseText Please take it now and mark it as taken in MediTrack.',
       );
     }
 
@@ -615,14 +724,14 @@ class NotificationService {
       return _NotificationContent(
         title: 'Reminder Follow-up: $medicineName',
         body:
-            'Still pending since $scheduledTime. $doseText Please take it as soon as possible and confirm in the app.',
+            '${patientText}Still pending since $scheduledTime. $doseText Please take it as soon as possible and confirm in the app.',
       );
     }
 
     return _NotificationContent(
       title: 'Urgent Reminder: $medicineName',
       body:
-          'Urgent: this dose remains unconfirmed since $scheduledTime. $doseText Take it immediately and update your medication log.',
+          '${patientText}Urgent: this dose remains unconfirmed since $scheduledTime. $doseText Take it immediately and update your medication log.',
     );
   }
 

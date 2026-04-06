@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:meditrack/services/medicine_icons.dart';
 import 'package:meditrack/services/notification_service.dart';
 import 'package:meditrack/services/medicine_storage.dart';
+import 'package:meditrack/services/patient_storage.dart';
 import 'package:meditrack/services/stock_storage.dart';
 import 'package:meditrack/tutorials/schedule_tutorial.dart';
 import 'package:showcaseview/showcaseview.dart';
@@ -1035,7 +1036,23 @@ class _MedicineModalState extends State<MedicineModal> {
     final bool hasAccess = await NotificationService.ensureNotificationAccess();
     if (!hasAccess) return;
 
+    final bool hasPatientLinkedRecord = records.any(
+      (MedicineRecord record) =>
+          record.patientId != null && record.patientId!.isNotEmpty,
+    );
+
+    final Map<String, String> patientNameById = <String, String>{};
+    if (hasPatientLinkedRecord) {
+      final List<PatientRecord> patients = await PatientStorage.loadPatients();
+      for (final PatientRecord patient in patients) {
+        patientNameById[patient.createdAt.toIso8601String()] = patient.fullName;
+      }
+    }
+
     for (final record in records) {
+      final String patientName =
+          patientNameById[record.patientId ?? '']?.trim() ?? '';
+
       if (record.reminderStartDate != null && record.reminderEndDate != null) {
         await NotificationService.scheduleMedicineReminderRange(
           medicineCreatedAtMillis: record.createdAt.millisecondsSinceEpoch,
@@ -1044,6 +1061,8 @@ class _MedicineModalState extends State<MedicineModal> {
           endDate: record.reminderEndDate!,
           hour: record.specificTime!.hour,
           minute: record.specificTime!.minute,
+          frequency: record.frequency,
+          patientName: patientName,
           doseAmount: record.doseAmount,
         );
       } else if (record.specificTime != null) {
@@ -1051,6 +1070,7 @@ class _MedicineModalState extends State<MedicineModal> {
           medicineCreatedAtMillis: record.createdAt.millisecondsSinceEpoch,
           medicineName: record.name,
           scheduledAt: record.specificTime!,
+          patientName: patientName,
           doseAmount: record.doseAmount,
         );
       }

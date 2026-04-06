@@ -5,6 +5,8 @@ import 'package:meditrack/pages/stocks.dart';
 import 'package:meditrack/services/medicine_icons.dart';
 import 'package:meditrack/services/medicine_storage.dart';
 import 'package:meditrack/services/patient_storage.dart';
+import 'package:meditrack/services/stock_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class CaregiverDashboardScreen extends StatefulWidget {
   const CaregiverDashboardScreen({super.key});
@@ -16,9 +18,14 @@ class CaregiverDashboardScreen extends StatefulWidget {
 
 class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
   int _selectedTabIndex = 0;
+  static const String _takenRemindersStorageKey = 'patient_taken_reminders_v1';
+  static const String _deductedRemindersStorageKey =
+      'patient_deducted_reminders_v1';
   List<PatientRecord> _patients = <PatientRecord>[];
   List<MedicineRecord> _patientMedicines = <MedicineRecord>[];
   Map<String, int> _reminderCountByPatientId = <String, int>{};
+  Set<String> _takenReminderKeys = <String>{};
+  Set<String> _deductedReminderKeys = <String>{};
   String? _selectedPatientId;
   DateTime _selectedReminderDate = DateTime.now();
   bool _isLoading = true;
@@ -74,7 +81,35 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
     await Future.wait<void>(<Future<void>>[
       _loadPatients(),
       _loadReminderCounts(),
+      _loadReminderCompletionState(),
     ]);
+  }
+
+  Future<void> _loadReminderCompletionState() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final List<String> taken =
+        prefs.getStringList(_takenRemindersStorageKey) ?? <String>[];
+    final List<String> deducted =
+        prefs.getStringList(_deductedRemindersStorageKey) ?? <String>[];
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _takenReminderKeys = taken.toSet();
+      _deductedReminderKeys = deducted.toSet();
+    });
+  }
+
+  Future<void> _persistReminderCompletionState() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(
+      _takenRemindersStorageKey,
+      _takenReminderKeys.toList(),
+    );
+    await prefs.setStringList(
+      _deductedRemindersStorageKey,
+      _deductedReminderKeys.toList(),
+    );
   }
 
   Future<void> _loadPatients() async {
@@ -349,6 +384,79 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
 
   bool _isSameDay(DateTime a, DateTime b) {
     return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  String _dateStorageKey(DateTime date) {
+    final String month = date.month.toString().padLeft(2, '0');
+    final String day = date.day.toString().padLeft(2, '0');
+    return '${date.year}-$month-$day';
+  }
+
+  String _reminderStorageKey(
+    _CaregiverReminderInstance reminder,
+    DateTime date,
+  ) {
+    return '${reminder.medicine.createdAt.toIso8601String()}_${_dateStorageKey(date)}_${reminder.time.hour}_${reminder.time.minute}';
+  }
+
+  int _extractDoseCount(String doseAmount) {
+    final RegExpMatch? match = RegExp(r'\d+').firstMatch(doseAmount);
+    if (match == null) {
+      return 1;
+    }
+    return int.tryParse(match.group(0)!) ?? 1;
+  }
+
+  Future<void> _markReminderAsTaken(_CaregiverReminderInstance reminder) async {
+    final DateTime today = DateTime.now();
+    if (!_isSameDay(_selectedReminderDate, today)) {
+      return;
+    }
+
+    final String storageKey = _reminderStorageKey(
+      reminder,
+      _selectedReminderDate,
+    );
+    if (_takenReminderKeys.contains(storageKey)) {
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _takenReminderKeys.add(storageKey);
+    });
+    await _persistReminderCompletionState();
+
+    final int doseCount = _extractDoseCount(reminder.medicine.doseAmount);
+    bool deducted = false;
+    if (!_deductedReminderKeys.contains(storageKey)) {
+      deducted = await StockStorage.deductStockForMedicine(
+        medicineName: reminder.medicine.name,
+        amount: doseCount,
+      );
+      if (deducted) {
+        if (mounted) {
+          setState(() {
+            _deductedReminderKeys.add(storageKey);
+          });
+        } else {
+          _deductedReminderKeys.add(storageKey);
+        }
+      }
+    }
+    await _persistReminderCompletionState();
+
+    if (!mounted) {
+      return;
+    }
+    final String message = deducted
+        ? 'Marked done and deducted $doseCount pill${doseCount == 1 ? '' : 's'} from ${reminder.medicine.name} stock.'
+        : 'Reminder marked done.';
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   bool _isScheduledOnWeekday(String frequency, DateTime day) {
@@ -696,6 +804,13 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
       periodColor = nightColor;
     }
 
+    final bool isToday = _isSameDay(_selectedReminderDate, DateTime.now());
+    final String reminderKey = _reminderStorageKey(
+      reminder,
+      _selectedReminderDate,
+    );
+    final bool isChecked = _takenReminderKeys.contains(reminderKey);
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -796,6 +911,40 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
                             ),
                           ),
                         ],
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: !isChecked
+                          ? () {
+                              if (!isToday) {
+                                return;
+                              }
+                              _markReminderAsTaken(reminder);
+                            }
+                          : null,
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        margin: const EdgeInsets.only(left: 8),
+                        decoration: BoxDecoration(
+                          color: isChecked
+                              ? const Color(0xFF8BBA91)
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: isChecked
+                                ? const Color(0xFF8BBA91)
+                                : const Color(0xFFBDBDBD),
+                            width: 2.5,
+                          ),
+                        ),
+                        child: isChecked
+                            ? const Icon(
+                                Icons.check,
+                                color: Colors.white,
+                                size: 24,
+                              )
+                            : null,
                       ),
                     ),
                   ],
