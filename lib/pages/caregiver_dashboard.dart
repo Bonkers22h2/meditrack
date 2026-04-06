@@ -272,6 +272,9 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
 
     setState(() {
       _patients.add(patient);
+      if (_selectedPatientId == null) {
+        _selectedPatientId = _patientIdFor(patient);
+      }
     });
   }
 
@@ -544,7 +547,7 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (_patients.isEmpty || _selectedPatientId == null) {
+    if (_patients.isEmpty) {
       return Center(
         child: Text(
           'Add a patient to view caregiver reports.',
@@ -556,6 +559,9 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
         ),
       );
     }
+
+    final String selectedPatientId =
+        _selectedPatientId ?? _patientIdFor(_patients.first);
 
     final String? selectedPatientName = _selectedPatientName();
 
@@ -599,7 +605,7 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
             ),
             child: DropdownButtonHideUnderline(
               child: DropdownButtonFormField<String>(
-                value: _selectedPatientId,
+                value: selectedPatientId,
                 decoration: const InputDecoration(border: InputBorder.none),
                 items: _patients
                     .map(
@@ -623,8 +629,8 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
           const SizedBox(height: 12),
           Expanded(
             child: ReportsScreen(
-              key: ValueKey<String?>(_selectedPatientId),
-              patientId: _selectedPatientId,
+              key: ValueKey<String?>(selectedPatientId),
+              patientId: selectedPatientId,
               patientLabel: selectedPatientName,
               takenRemindersStorageKey: 'patient_taken_reminders_v1',
               title: 'Adherence Report',
