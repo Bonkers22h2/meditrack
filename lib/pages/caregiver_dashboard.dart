@@ -8,7 +8,9 @@ import 'package:meditrack/services/medicine_storage.dart';
 import 'package:meditrack/services/notification_service.dart';
 import 'package:meditrack/services/patient_storage.dart';
 import 'package:meditrack/services/stock_storage.dart';
+import 'package:meditrack/tutorials/tutorial_preferences.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:showcaseview/showcaseview.dart';
 
 class CaregiverDashboardScreen extends StatefulWidget {
   const CaregiverDashboardScreen({super.key});
@@ -20,6 +22,10 @@ class CaregiverDashboardScreen extends StatefulWidget {
 
 class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
   int _selectedTabIndex = 0;
+  final GlobalKey _caregiverTitleShowcaseKey = GlobalKey();
+  final GlobalKey _addPatientShowcaseKey = GlobalKey();
+  final GlobalKey _patientsListShowcaseKey = GlobalKey();
+  final GlobalKey _caregiverRemindersTabShowcaseKey = GlobalKey();
   static const String _takenRemindersStorageKey = 'patient_taken_reminders_v1';
   static const String _deductedRemindersStorageKey =
       'patient_deducted_reminders_v1';
@@ -73,6 +79,43 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
   void initState() {
     super.initState();
     _loadDashboardData();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      _startCaregiverTutorialIfNeeded();
+    });
+  }
+
+  Future<void> _startCaregiverTutorialIfNeeded() async {
+    final bool hasSeenTutorial = await TutorialPreferences.hasSeen(
+      TutorialPreferences.caregiverDashboardTutorialSeenKey,
+    );
+    if (hasSeenTutorial || !mounted) {
+      return;
+    }
+
+    await _startCaregiverTutorial(markSeenAfter: true);
+  }
+
+  Future<void> _startCaregiverTutorial({bool markSeenAfter = false}) async {
+    await Future<void>.delayed(const Duration(milliseconds: 250));
+    if (!mounted) {
+      return;
+    }
+
+    ShowCaseWidget.of(context).startShowCase(<GlobalKey>[
+      _caregiverTitleShowcaseKey,
+      _addPatientShowcaseKey,
+      _patientsListShowcaseKey,
+      _caregiverRemindersTabShowcaseKey,
+    ]);
+
+    if (markSeenAfter) {
+      await TutorialPreferences.markSeen(
+        TutorialPreferences.caregiverDashboardTutorialSeenKey,
+      );
+    }
   }
 
   String _patientIdFor(PatientRecord patient) {
@@ -725,6 +768,14 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 12),
+          SizedBox(
+            height: 40,
+            child: Image.asset(
+              'android/app/src/main/res/assets/icons (1).png',
+              fit: BoxFit.contain,
+            ),
+          ),
+          const SizedBox(height: 16),
           Text(
             'Patient Reminders',
             style: TextStyle(
@@ -1024,15 +1075,7 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
                               color: textLight,
                               size: 24,
                             ),
-                            onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Caregiver help center is coming soon.',
-                                  ),
-                                ),
-                              );
-                            },
+                            onPressed: _startCaregiverTutorial,
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -1074,13 +1117,19 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
                   ],
                 ),
                 const SizedBox(height: 24),
-                Text(
-                  'Caregiver Dashboard',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w600,
-                    color: textDark,
-                    letterSpacing: -0.5,
+                Showcase(
+                  key: _caregiverTitleShowcaseKey,
+                  title: 'Caregiver dashboard overview',
+                  description:
+                      'This is your caregiver home screen for managing patients and reminders.',
+                  child: Text(
+                    'Caregiver Dashboard',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w600,
+                      color: textDark,
+                      letterSpacing: -0.5,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -1093,19 +1142,25 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
                   ),
                 ),
                 const SizedBox(height: 18),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: _showAddPatientDialog,
-                    icon: const Icon(Icons.person_add_alt_1_rounded),
-                    label: const Text('Add Patient'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: actionColor,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(18),
+                Showcase(
+                  key: _addPatientShowcaseKey,
+                  title: 'Add a new patient',
+                  description:
+                      'Tap this button to create a patient profile and track their medications.',
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: _showAddPatientDialog,
+                      icon: const Icon(Icons.person_add_alt_1_rounded),
+                      label: const Text('Add Patient'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: actionColor,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
+                        ),
                       ),
                     ),
                   ),
@@ -1153,33 +1208,39 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
                   ),
                 ),
                 const SizedBox(height: 10),
-                Expanded(
-                  child: _isLoading
-                      ? const Center(child: CircularProgressIndicator())
-                      : _patients.isEmpty
-                      ? Center(
-                          child: Text(
-                            'No patients yet. Tap Add Patient to begin.',
-                            style: TextStyle(
-                              color: textFaint,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
+                Showcase(
+                  key: _patientsListShowcaseKey,
+                  title: 'Patient list',
+                  description:
+                      'Select a patient card to view details and reminders for that patient.',
+                  child: Expanded(
+                    child: _isLoading
+                        ? const Center(child: CircularProgressIndicator())
+                        : _patients.isEmpty
+                        ? Center(
+                            child: Text(
+                              'No patients yet. Tap Add Patient to begin.',
+                              style: TextStyle(
+                                color: textFaint,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
+                          )
+                        : ListView.separated(
+                            itemCount: _patients.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: 10),
+                            itemBuilder: (BuildContext context, int index) {
+                              final PatientRecord patient = _patients[index];
+                              return InkWell(
+                                borderRadius: BorderRadius.circular(16),
+                                onTap: () => _openPatientProfile(patient),
+                                child: _buildPatientCard(patient),
+                              );
+                            },
                           ),
-                        )
-                      : ListView.separated(
-                          itemCount: _patients.length,
-                          separatorBuilder: (_, __) =>
-                              const SizedBox(height: 10),
-                          itemBuilder: (BuildContext context, int index) {
-                            final PatientRecord patient = _patients[index];
-                            return InkWell(
-                              borderRadius: BorderRadius.circular(16),
-                              onTap: () => _openPatientProfile(patient),
-                              child: _buildPatientCard(patient),
-                            );
-                          },
-                        ),
+                  ),
                 ),
               ],
             ),
@@ -1193,38 +1254,44 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
     return Scaffold(
       backgroundColor: backgroundColor,
       body: SafeArea(child: currentTab),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedTabIndex,
-        onTap: (int index) {
-          setState(() {
-            _selectedTabIndex = index;
-          });
-          if (index == 1) {
-            _loadReminderCounts();
-            _loadReminderCompletionState();
-          }
-        },
-        backgroundColor: cardColor,
-        selectedItemColor: textDark,
-        unselectedItemColor: textFaint,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.alarm_outlined),
-            label: 'Reminders',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.inventory_2_outlined),
-            label: 'Stocks',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.insert_chart_outlined),
-            label: 'Reports',
-          ),
-        ],
+      bottomNavigationBar: Showcase(
+        key: _caregiverRemindersTabShowcaseKey,
+        title: 'Reminders tab',
+        description:
+            'Open this tab to view and mark reminders from all patients in one place.',
+        child: BottomNavigationBar(
+          currentIndex: _selectedTabIndex,
+          onTap: (int index) {
+            setState(() {
+              _selectedTabIndex = index;
+            });
+            if (index == 1) {
+              _loadReminderCounts();
+              _loadReminderCompletionState();
+            }
+          },
+          backgroundColor: cardColor,
+          selectedItemColor: textDark,
+          unselectedItemColor: textFaint,
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.home_outlined),
+              label: 'Home',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.alarm_outlined),
+              label: 'Reminders',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.inventory_2_outlined),
+              label: 'Stocks',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.insert_chart_outlined),
+              label: 'Reports',
+            ),
+          ],
+        ),
       ),
     );
   }

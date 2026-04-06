@@ -11,6 +11,8 @@ class TutorialPreferences {
   static const String scheduleTutorialSeenKey = 'schedule_tutorial_seen_v1';
   static const String stockTutorialSeenKey = 'stock_tutorial_seen_v1';
   static const String mainTutorialSeenKey = 'main_tutorial_seen_v1';
+  static const String caregiverDashboardTutorialSeenKey =
+      'caregiver_dashboard_tutorial_seen_v1';
 
   static const List<String> allTutorialSeenKeys = <String>[
     dashboardTutorialSeenKey,
@@ -19,6 +21,7 @@ class TutorialPreferences {
     scheduleTutorialSeenKey,
     stockTutorialSeenKey,
     mainTutorialSeenKey,
+    caregiverDashboardTutorialSeenKey,
   ];
 
   static Future<bool> hasSeen(String key) async {
