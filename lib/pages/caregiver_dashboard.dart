@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:meditrack/pages/patient_profile.dart';
 import 'package:meditrack/pages/reports.dart';
 import 'package:meditrack/pages/stocks.dart';
+import 'package:meditrack/services/medicine_icons.dart';
 import 'package:meditrack/services/medicine_storage.dart';
 import 'package:meditrack/services/patient_storage.dart';
 
@@ -16,8 +17,10 @@ class CaregiverDashboardScreen extends StatefulWidget {
 class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
   int _selectedTabIndex = 0;
   List<PatientRecord> _patients = <PatientRecord>[];
+  List<MedicineRecord> _patientMedicines = <MedicineRecord>[];
   Map<String, int> _reminderCountByPatientId = <String, int>{};
   String? _selectedPatientId;
+  DateTime _selectedReminderDate = DateTime.now();
   bool _isLoading = true;
 
   final Color backgroundColor = const Color(0xFFF4F5F0);
@@ -26,6 +29,9 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
   final Color textLight = const Color(0xFF757575);
   final Color textFaint = const Color(0xFF8B9084);
   final Color actionColor = const Color(0xFF6E765D);
+  final Color morningColor = const Color(0xFF56BFA8);
+  final Color afternoonColor = const Color(0xFFFFB74D);
+  final Color nightColor = const Color(0xFF7986CB);
 
   InputDecoration _patientFieldDecoration({
     required String label,
@@ -95,12 +101,14 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
     final List<MedicineRecord> allRecords =
         await MedicineStorage.loadMedicines();
     final Map<String, int> counts = <String, int>{};
+    final List<MedicineRecord> patientMedicines = <MedicineRecord>[];
 
     for (final MedicineRecord record in allRecords) {
       final String? patientId = record.patientId;
       if (patientId == null || patientId.isEmpty) {
         continue;
       }
+      patientMedicines.add(record);
       counts[patientId] = (counts[patientId] ?? 0) + 1;
     }
 
@@ -110,6 +118,7 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
 
     setState(() {
       _reminderCountByPatientId = counts;
+      _patientMedicines = patientMedicines;
     });
   }
 
@@ -304,6 +313,499 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
     }
 
     return null;
+  }
+
+  PatientRecord? _patientForId(String patientId) {
+    for (final PatientRecord patient in _patients) {
+      if (_patientIdFor(patient) == patientId) {
+        return patient;
+      }
+    }
+    return null;
+  }
+
+  String _dateLabel(DateTime date, DateTime today) {
+    if (_isSameDay(date, today)) {
+      return 'Today';
+    }
+    if (_isSameDay(date, today.subtract(const Duration(days: 1)))) {
+      return 'Yesterday';
+    }
+    if (_isSameDay(date, today.add(const Duration(days: 1)))) {
+      return 'Tomorrow';
+    }
+    const List<String> shortWeekdays = <String>[
+      'Mon',
+      'Tue',
+      'Wed',
+      'Thu',
+      'Fri',
+      'Sat',
+      'Sun',
+    ];
+    final String weekday = shortWeekdays[date.weekday - 1];
+    return '$weekday ${date.month}/${date.day}';
+  }
+
+  bool _isSameDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  bool _isScheduledOnWeekday(String frequency, DateTime day) {
+    final RegExp onDaysRegex = RegExp(
+      r'^Every \d+(?:\.\d+)? hours on (.+)$',
+      caseSensitive: false,
+    );
+    final Match? match = onDaysRegex.firstMatch(frequency.trim());
+    if (match == null) {
+      return true;
+    }
+
+    final String daysText = (match.group(1) ?? '').trim();
+    if (daysText.isEmpty) {
+      return true;
+    }
+
+    const Map<String, int> weekdayByToken = <String, int>{
+      'mon': DateTime.monday,
+      'monday': DateTime.monday,
+      'tue': DateTime.tuesday,
+      'tues': DateTime.tuesday,
+      'tuesday': DateTime.tuesday,
+      'wed': DateTime.wednesday,
+      'wednesday': DateTime.wednesday,
+      'thu': DateTime.thursday,
+      'thur': DateTime.thursday,
+      'thurs': DateTime.thursday,
+      'thursday': DateTime.thursday,
+      'fri': DateTime.friday,
+      'friday': DateTime.friday,
+      'sat': DateTime.saturday,
+      'saturday': DateTime.saturday,
+      'sun': DateTime.sunday,
+      'sunday': DateTime.sunday,
+    };
+
+    final List<String> tokens = daysText
+        .split(',')
+        .map((String token) => token.trim().toLowerCase())
+        .where((String token) => token.isNotEmpty)
+        .toList();
+
+    if (tokens.isEmpty) {
+      return true;
+    }
+
+    final Set<int> allowedWeekdays = tokens
+        .map((String token) => weekdayByToken[token])
+        .whereType<int>()
+        .toSet();
+
+    if (allowedWeekdays.isEmpty) {
+      return true;
+    }
+
+    return allowedWeekdays.contains(day.weekday);
+  }
+
+  List<_CaregiverReminderInstance> _expandPatientRemindersForDate(
+    DateTime date,
+  ) {
+    final DateTime selectedDateOnly = DateTime(date.year, date.month, date.day);
+    final List<_CaregiverReminderInstance> result =
+        <_CaregiverReminderInstance>[];
+
+    for (final MedicineRecord medicine in _patientMedicines) {
+      if (medicine.specificTime == null) {
+        continue;
+      }
+
+      final String? patientId = medicine.patientId;
+      if (patientId == null || patientId.isEmpty) {
+        continue;
+      }
+
+      final PatientRecord? patient = _patientForId(patientId);
+      if (patient == null) {
+        continue;
+      }
+
+      if (!_isScheduledOnWeekday(medicine.frequency, selectedDateOnly)) {
+        continue;
+      }
+
+      final DateTime? startOnly = medicine.reminderStartDate == null
+          ? null
+          : DateTime(
+              medicine.reminderStartDate!.year,
+              medicine.reminderStartDate!.month,
+              medicine.reminderStartDate!.day,
+            );
+      final DateTime? endOnly = medicine.reminderEndDate == null
+          ? null
+          : DateTime(
+              medicine.reminderEndDate!.year,
+              medicine.reminderEndDate!.month,
+              medicine.reminderEndDate!.day,
+            );
+
+      if (startOnly != null || endOnly != null) {
+        if (startOnly != null && selectedDateOnly.isBefore(startOnly)) {
+          continue;
+        }
+        if (endOnly != null && selectedDateOnly.isAfter(endOnly)) {
+          continue;
+        }
+
+        result.add(
+          _CaregiverReminderInstance(
+            medicine: medicine,
+            patient: patient,
+            time: TimeOfDay(
+              hour: medicine.specificTime!.hour,
+              minute: medicine.specificTime!.minute,
+            ),
+          ),
+        );
+      } else {
+        final DateTime targetDate = DateTime(
+          medicine.specificTime!.year,
+          medicine.specificTime!.month,
+          medicine.specificTime!.day,
+        );
+
+        if (_isSameDay(targetDate, selectedDateOnly)) {
+          result.add(
+            _CaregiverReminderInstance(
+              medicine: medicine,
+              patient: patient,
+              time: TimeOfDay(
+                hour: medicine.specificTime!.hour,
+                minute: medicine.specificTime!.minute,
+              ),
+            ),
+          );
+        }
+      }
+    }
+
+    result.sort((a, b) {
+      final int timeCompare =
+          (a.time.hour * 60 + a.time.minute) -
+          (b.time.hour * 60 + b.time.minute);
+      if (timeCompare != 0) {
+        return timeCompare;
+      }
+      return a.patient.fullName.toLowerCase().compareTo(
+        b.patient.fullName.toLowerCase(),
+      );
+    });
+    return result;
+  }
+
+  Widget _buildReminderDateSelector() {
+    final DateTime today = DateTime.now();
+    final List<DateTime> days = List<DateTime>.generate(
+      7,
+      (int index) => today.add(Duration(days: index - 3)),
+    );
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          const SizedBox(width: 4),
+          ...days.map((DateTime date) {
+            final bool isSelected = _isSameDay(date, _selectedReminderDate);
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: ChoiceChip(
+                label: Text(
+                  _dateLabel(date, today),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: isSelected ? Colors.white : textDark,
+                    fontSize: 14,
+                  ),
+                ),
+                selected: isSelected,
+                selectedColor: const Color(0xFF8BBA91),
+                backgroundColor: cardColor,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                onSelected: (_) {
+                  setState(() {
+                    _selectedReminderDate = date;
+                  });
+                },
+              ),
+            );
+          }),
+          const SizedBox(width: 4),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCaregiverRemindersTab() {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_patients.isEmpty) {
+      return Center(
+        child: Text(
+          'Add a patient to view reminders.',
+          style: TextStyle(
+            color: textFaint,
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      );
+    }
+
+    final List<_CaregiverReminderInstance> reminders =
+        _expandPatientRemindersForDate(_selectedReminderDate);
+    final Map<String, List<_CaregiverReminderInstance>> grouped =
+        <String, List<_CaregiverReminderInstance>>{
+          'Morning': <_CaregiverReminderInstance>[],
+          'Afternoon': <_CaregiverReminderInstance>[],
+          'Night': <_CaregiverReminderInstance>[],
+        };
+
+    for (final _CaregiverReminderInstance reminder in reminders) {
+      final int hour = reminder.time.hour;
+      if (hour >= 5 && hour < 12) {
+        grouped['Morning']!.add(reminder);
+      } else if (hour >= 12 && hour < 18) {
+        grouped['Afternoon']!.add(reminder);
+      } else {
+        grouped['Night']!.add(reminder);
+      }
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 12),
+          Text(
+            'Patient Reminders',
+            style: TextStyle(
+              color: textDark,
+              fontSize: 24,
+              fontWeight: FontWeight.w600,
+              letterSpacing: -0.4,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Every reminder from every patient appears here by schedule.',
+            style: TextStyle(
+              color: textFaint,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 14),
+          _buildReminderDateSelector(),
+          const SizedBox(height: 12),
+          Text(
+            '${reminders.length} reminder${reminders.length == 1 ? '' : 's'} found',
+            style: TextStyle(
+              color: textFaint,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Expanded(
+            child: reminders.isEmpty
+                ? Center(
+                    child: Text(
+                      'No reminders for this day.',
+                      style: TextStyle(
+                        color: textFaint,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  )
+                : ListView(
+                    children: [
+                      for (final String period in <String>[
+                        'Morning',
+                        'Afternoon',
+                        'Night',
+                      ])
+                        if (grouped[period]!.isNotEmpty) ...[
+                          Padding(
+                            padding: const EdgeInsets.only(
+                              top: 12,
+                              bottom: 8,
+                              left: 4,
+                            ),
+                            child: Text(
+                              period,
+                              style: TextStyle(
+                                fontSize: 19,
+                                fontWeight: FontWeight.bold,
+                                color: textDark,
+                              ),
+                            ),
+                          ),
+                          ...grouped[period]!.map(
+                            (_CaregiverReminderInstance reminder) =>
+                                _buildCaregiverReminderCard(reminder),
+                          ),
+                        ],
+                    ],
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _buildReminderSubtitle(MedicineRecord medicine) {
+    final String dose = medicine.doseAmount.trim();
+    final String frequency = medicine.frequency.trim();
+    if (dose.isEmpty && frequency.isEmpty) {
+      return 'No dosage details';
+    }
+    if (dose.isEmpty) {
+      return frequency;
+    }
+    if (frequency.isEmpty) {
+      return dose;
+    }
+    return '$dose • $frequency';
+  }
+
+  Widget _buildCaregiverReminderCard(_CaregiverReminderInstance reminder) {
+    final int hour = reminder.time.hour;
+    final Color periodColor;
+    if (hour >= 5 && hour < 12) {
+      periodColor = morningColor;
+    } else if (hour >= 12 && hour < 18) {
+      periodColor = afternoonColor;
+    } else {
+      periodColor = nightColor;
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              width: 6,
+              decoration: BoxDecoration(
+                color: periodColor,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(18),
+                  bottomLeft: Radius.circular(18),
+                ),
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE7EFE4),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        MedicineIcons.resolve(reminder.medicine.iconKey),
+                        color: const Color(0xFF5C7A58),
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Text(
+                      reminder.time.format(context),
+                      style: TextStyle(
+                        color: textDark,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            reminder.medicine.name,
+                            style: TextStyle(
+                              color: const Color(0xFF355A3A),
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFF3D8),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              reminder.patient.fullName,
+                              style: TextStyle(
+                                color: const Color(0xFF7A4D00),
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${_buildReminderSubtitle(reminder.medicine)} • ${reminder.patient.relationship}',
+                            style: TextStyle(
+                              color: textLight,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -508,6 +1010,8 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
             ),
           )
         : _selectedTabIndex == 1
+        ? _buildCaregiverRemindersTab()
+        : _selectedTabIndex == 2
         ? const StockScreen()
         : _buildReportsTab();
 
@@ -520,6 +1024,9 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
           setState(() {
             _selectedTabIndex = index;
           });
+          if (index == 1) {
+            _loadReminderCounts();
+          }
         },
         backgroundColor: cardColor,
         selectedItemColor: textDark,
@@ -528,6 +1035,10 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
           BottomNavigationBarItem(
             icon: Icon(Icons.home_outlined),
             label: 'Home',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.alarm_outlined),
+            label: 'Reminders',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.inventory_2_outlined),
@@ -736,4 +1247,16 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
       ),
     );
   }
+}
+
+class _CaregiverReminderInstance {
+  const _CaregiverReminderInstance({
+    required this.medicine,
+    required this.patient,
+    required this.time,
+  });
+
+  final MedicineRecord medicine;
+  final PatientRecord patient;
+  final TimeOfDay time;
 }
