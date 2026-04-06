@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:meditrack/modals/settings_modal.dart';
 import 'package:meditrack/pages/patient_profile.dart';
 import 'package:meditrack/pages/reports.dart';
 import 'package:meditrack/pages/stocks.dart';
 import 'package:meditrack/services/medicine_icons.dart';
 import 'package:meditrack/services/medicine_storage.dart';
+import 'package:meditrack/services/notification_service.dart';
 import 'package:meditrack/services/patient_storage.dart';
 import 'package:meditrack/services/stock_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -333,7 +335,10 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
     if (!mounted) {
       return;
     }
-    await _loadReminderCounts();
+    await Future.wait<void>(<Future<void>>[
+      _loadReminderCounts(),
+      _loadReminderCompletionState(),
+    ]);
   }
 
   String? _selectedPatientName() {
@@ -418,6 +423,7 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
       _selectedReminderDate,
     );
     if (_takenReminderKeys.contains(storageKey)) {
+      await _cancelReminderNotifications(reminder);
       return;
     }
 
@@ -428,6 +434,7 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
       _takenReminderKeys.add(storageKey);
     });
     await _persistReminderCompletionState();
+    await _cancelReminderNotifications(reminder);
 
     final int doseCount = _extractDoseCount(reminder.medicine.doseAmount);
     bool deducted = false;
@@ -457,6 +464,24 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _cancelReminderNotifications(
+    _CaregiverReminderInstance reminder,
+  ) async {
+    final DateTime scheduledAt = DateTime(
+      _selectedReminderDate.year,
+      _selectedReminderDate.month,
+      _selectedReminderDate.day,
+      reminder.time.hour,
+      reminder.time.minute,
+    );
+
+    await NotificationService.cancelEscalatingReminderAttempts(
+      medicineCreatedAtMillis:
+          reminder.medicine.createdAt.millisecondsSinceEpoch,
+      scheduledAt: scheduledAt,
+    ).catchError((_) {});
   }
 
   bool _isScheduledOnWeekday(String frequency, DateTime day) {
@@ -1033,12 +1058,13 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
                               size: 24,
                             ),
                             onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Caregiver settings will be added soon.',
-                                  ),
-                                ),
+                              showModalBottomSheet(
+                                context: context,
+                                isScrollControlled: true,
+                                useSafeArea: true,
+                                backgroundColor: Colors.transparent,
+                                builder: (BuildContext context) =>
+                                    const SettingsModal(),
                               );
                             },
                           ),
@@ -1175,6 +1201,7 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
           });
           if (index == 1) {
             _loadReminderCounts();
+            _loadReminderCompletionState();
           }
         },
         backgroundColor: cardColor,
