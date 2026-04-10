@@ -15,14 +15,14 @@ class NotificationService {
 
   static bool _initialized = false;
   static const int _escalationAttempts = 3;
-  static const int _continuousLevel3Retries = 12;
+  static const int _continuousLevel3Retries = 0;
   static const int _totalReminderAttempts =
       _escalationAttempts + _continuousLevel3Retries;
   static const Duration _escalationInterval = Duration(minutes: 2);
-  static const String _defaultChannelId = 'medicine_reminders_v3';
-  static const String _level1ChannelId = 'medicine_reminders_level_1_v3';
-  static const String _level2ChannelId = 'medicine_reminders_level_2_v3';
-  static const String _level3ChannelId = 'medicine_reminders_level_3_v3';
+  static const String _defaultChannelId = 'medicine_reminders_v4';
+  static const String _level1ChannelId = 'medicine_reminders_level_1_v4';
+  static const String _level2ChannelId = 'medicine_reminders_level_2_v4';
+  static const String _level3ChannelId = 'medicine_reminders_level_3_v4';
   static const String _level1Sound = 'reminder_level_1';
   static const String _level2Sound = 'reminder_level_2';
   static const String _level3Sound = 'reminder_level_3';

@@ -1020,7 +1020,7 @@ class _MedicineModalState extends State<MedicineModal> {
         }
       }
 
-      _scheduleNotificationsInBackground(recordsToSave);
+      await _scheduleNotificationsInBackground(recordsToSave);
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       _showSnackBar('Error saving: $e');
@@ -1034,7 +1034,14 @@ class _MedicineModalState extends State<MedicineModal> {
     List<MedicineRecord> records,
   ) async {
     final bool hasAccess = await NotificationService.ensureNotificationAccess();
-    if (!hasAccess) return;
+    if (!hasAccess) {
+      if (mounted) {
+        _showSnackBar(
+          'Saved medicine, but notifications are disabled on this device.',
+        );
+      }
+      return;
+    }
 
     final bool hasPatientLinkedRecord = records.any(
       (MedicineRecord record) =>
@@ -1049,31 +1056,43 @@ class _MedicineModalState extends State<MedicineModal> {
       }
     }
 
+    bool hadSchedulingError = false;
     for (final record in records) {
       final String patientName =
           patientNameById[record.patientId ?? '']?.trim() ?? '';
 
-      if (record.reminderStartDate != null && record.reminderEndDate != null) {
-        await NotificationService.scheduleMedicineReminderRange(
-          medicineCreatedAtMillis: record.createdAt.millisecondsSinceEpoch,
-          medicineName: record.name,
-          startDate: record.reminderStartDate!,
-          endDate: record.reminderEndDate!,
-          hour: record.specificTime!.hour,
-          minute: record.specificTime!.minute,
-          frequency: record.frequency,
-          patientName: patientName,
-          doseAmount: record.doseAmount,
-        );
-      } else if (record.specificTime != null) {
-        await NotificationService.scheduleMedicineReminder(
-          medicineCreatedAtMillis: record.createdAt.millisecondsSinceEpoch,
-          medicineName: record.name,
-          scheduledAt: record.specificTime!,
-          patientName: patientName,
-          doseAmount: record.doseAmount,
-        );
+      try {
+        if (record.reminderStartDate != null &&
+            record.reminderEndDate != null) {
+          await NotificationService.scheduleMedicineReminderRange(
+            medicineCreatedAtMillis: record.createdAt.millisecondsSinceEpoch,
+            medicineName: record.name,
+            startDate: record.reminderStartDate!,
+            endDate: record.reminderEndDate!,
+            hour: record.specificTime!.hour,
+            minute: record.specificTime!.minute,
+            frequency: record.frequency,
+            patientName: patientName,
+            doseAmount: record.doseAmount,
+          );
+        } else if (record.specificTime != null) {
+          await NotificationService.scheduleMedicineReminder(
+            medicineCreatedAtMillis: record.createdAt.millisecondsSinceEpoch,
+            medicineName: record.name,
+            scheduledAt: record.specificTime!,
+            patientName: patientName,
+            doseAmount: record.doseAmount,
+          );
+        }
+      } catch (_) {
+        hadSchedulingError = true;
       }
+    }
+
+    if (hadSchedulingError && mounted) {
+      _showSnackBar(
+        'Saved medicine, but some reminders could not be scheduled.',
+      );
     }
   }
 
