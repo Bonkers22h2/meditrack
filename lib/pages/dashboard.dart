@@ -70,6 +70,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Set<String> _takenReminderKeys = <String>{};
   Set<String> _deductedReminderKeys = <String>{};
   Map<String, String> _stockIconByMedicine = <String, String>{};
+  Set<String> _expiredMedicineNames = <String>{};
   int _stockCount = 0;
   bool _isLoading = true;
   DateTime _selectedDate = DateTime.now();
@@ -194,16 +195,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
       return;
     }
     final Map<String, String> stockIconByMedicine = <String, String>{};
+    final Set<String> expiredMedicineNames = <String>{};
     for (final StockRecord stock in stocks) {
       final String key = stock.medicineName.trim().toLowerCase();
       if (key.isEmpty) {
         continue;
       }
       stockIconByMedicine[key] = stock.iconKey;
+      if (stock.isExpired) {
+        expiredMedicineNames.add(key);
+      }
     }
     setState(() {
       _stockCount = stocks.length;
       _stockIconByMedicine = stockIconByMedicine;
+      _expiredMedicineNames = expiredMedicineNames;
     });
   }
 
@@ -267,13 +273,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (!mounted) {
       return;
     }
-    final List<StockRecord> stocks = await StockStorage.loadStocks();
-    final StockRecord? stock = stocks.firstWhere(
-      (StockRecord s) => s.medicineName.trim().toLowerCase() == normalizedName,
-      orElse: () => throw StateError('No matching stock record'),
-    );
-
-    if (stock != null && stock.isExpired) {
+    if (_expiredMedicineNames.contains(normalizedName)) {
       if (!mounted) {
         return;
       }
@@ -589,8 +589,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
           onTap: (int index) {
             setState(() {
               _selectedTabIndex = index;
-              if (index == 1) _loadStocks();
             });
+            if (index == 0 || index == 1) {
+              _loadStocks();
+            }
           },
           backgroundColor: cardColor,
           selectedItemColor: textDark,
@@ -897,6 +899,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     for (final medicine in _medicines) {
       // Skip medicines without time info
       if (medicine.specificTime == null) continue;
+
+      final String normalizedMedicineName = medicine.name.trim().toLowerCase();
+      if (normalizedMedicineName.isNotEmpty &&
+          _expiredMedicineNames.contains(normalizedMedicineName)) {
+        continue;
+      }
 
       // Respect selected weekdays from frequency text (e.g. "on Sun, Tue").
       if (!_isScheduledOnWeekday(medicine.frequency, selectedDateOnly)) {

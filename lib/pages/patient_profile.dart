@@ -25,6 +25,7 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
   List<MedicineRecord> _reminders = <MedicineRecord>[];
   Set<String> _takenReminderKeys = <String>{};
   Set<String> _deductedReminderKeys = <String>{};
+  Set<String> _expiredMedicineNames = <String>{};
   bool _isLoadingReminders = true;
   DateTime _selectedDate = DateTime.now();
 
@@ -34,7 +35,25 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
   void initState() {
     super.initState();
     _loadReminders();
+    _loadExpiredMedicineNames();
     _loadReminderCompletionState();
+  }
+
+  Future<void> _loadExpiredMedicineNames() async {
+    final List<StockRecord> stocks = await StockStorage.loadStocks();
+    final Set<String> expiredNames = stocks
+        .where((StockRecord stock) => stock.isExpired)
+        .map((StockRecord stock) => stock.medicineName.trim().toLowerCase())
+        .where((String name) => name.isNotEmpty)
+        .toSet();
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _expiredMedicineNames = expiredNames;
+    });
   }
 
   Future<void> _loadReminders() async {
@@ -133,6 +152,20 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
       return;
     }
 
+    final String normalizedMedicineName = reminder.name.trim().toLowerCase();
+    if (normalizedMedicineName.isNotEmpty &&
+        _expiredMedicineNames.contains(normalizedMedicineName)) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('This medicine is expired and cannot be used.'),
+        ),
+      );
+      return;
+    }
+
     if (!mounted) {
       return;
     }
@@ -225,6 +258,12 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
 
     for (final MedicineRecord reminder in _reminders) {
       if (reminder.specificTime == null) {
+        continue;
+      }
+
+      final String normalizedMedicineName = reminder.name.trim().toLowerCase();
+      if (normalizedMedicineName.isNotEmpty &&
+          _expiredMedicineNames.contains(normalizedMedicineName)) {
         continue;
       }
 

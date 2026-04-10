@@ -34,6 +34,7 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
   Map<String, int> _reminderCountByPatientId = <String, int>{};
   Set<String> _takenReminderKeys = <String>{};
   Set<String> _deductedReminderKeys = <String>{};
+  Set<String> _expiredMedicineNames = <String>{};
   String? _selectedPatientId;
   DateTime _selectedReminderDate = DateTime.now();
   bool _isLoading = true;
@@ -123,11 +124,29 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
   }
 
   Future<void> _loadDashboardData() async {
+    await _loadExpiredMedicineNames();
     await Future.wait<void>(<Future<void>>[
       _loadPatients(),
       _loadReminderCounts(),
       _loadReminderCompletionState(),
     ]);
+  }
+
+  Future<void> _loadExpiredMedicineNames() async {
+    final List<StockRecord> stocks = await StockStorage.loadStocks();
+    final Set<String> expiredNames = stocks
+        .where((StockRecord stock) => stock.isExpired)
+        .map((StockRecord stock) => stock.medicineName.trim().toLowerCase())
+        .where((String name) => name.isNotEmpty)
+        .toSet();
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _expiredMedicineNames = expiredNames;
+    });
   }
 
   Future<void> _loadReminderCompletionState() async {
@@ -186,6 +205,11 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
     for (final MedicineRecord record in allRecords) {
       final String? patientId = record.patientId;
       if (patientId == null || patientId.isEmpty) {
+        continue;
+      }
+      final String normalizedMedicineName = record.name.trim().toLowerCase();
+      if (normalizedMedicineName.isNotEmpty &&
+          _expiredMedicineNames.contains(normalizedMedicineName)) {
         continue;
       }
       patientMedicines.add(record);
@@ -470,6 +494,22 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
       return;
     }
 
+    final String normalizedMedicineName = reminder.medicine.name
+        .trim()
+        .toLowerCase();
+    if (normalizedMedicineName.isNotEmpty &&
+        _expiredMedicineNames.contains(normalizedMedicineName)) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('This medicine is expired and cannot be used.'),
+        ),
+      );
+      return;
+    }
+
     if (!mounted) {
       return;
     }
@@ -593,6 +633,12 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
 
     for (final MedicineRecord medicine in _patientMedicines) {
       if (medicine.specificTime == null) {
+        continue;
+      }
+
+      final String normalizedMedicineName = medicine.name.trim().toLowerCase();
+      if (normalizedMedicineName.isNotEmpty &&
+          _expiredMedicineNames.contains(normalizedMedicineName)) {
         continue;
       }
 
@@ -1265,7 +1311,8 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
             setState(() {
               _selectedTabIndex = index;
             });
-            if (index == 1) {
+            if (index == 0 || index == 1) {
+              _loadExpiredMedicineNames();
               _loadReminderCounts();
               _loadReminderCompletionState();
             }
