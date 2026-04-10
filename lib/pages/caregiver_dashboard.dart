@@ -1208,12 +1208,12 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
                   ),
                 ),
                 const SizedBox(height: 10),
-                Showcase(
-                  key: _patientsListShowcaseKey,
-                  title: 'Patient list',
-                  description:
-                      'Select a patient card to view details and reminders for that patient.',
-                  child: Expanded(
+                Expanded(
+                  child: Showcase(
+                    key: _patientsListShowcaseKey,
+                    title: 'Patient list',
+                    description:
+                        'Select a patient card to view details and reminders for that patient.',
                     child: _isLoading
                         ? const Center(child: CircularProgressIndicator())
                         : _patients.isEmpty
