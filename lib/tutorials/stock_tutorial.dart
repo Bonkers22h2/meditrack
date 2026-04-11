@@ -8,13 +8,29 @@ List<GlobalKey> buildStockTutorialSteps({
   required GlobalKey titleShowcaseKey,
   required GlobalKey addMedicationShowcaseKey,
   required GlobalKey stockListShowcaseKey,
-  required GlobalKey reportShowcaseKey,
 }) {
   return <GlobalKey>[
     titleShowcaseKey,
     addMedicationShowcaseKey,
     stockListShowcaseKey,
-    reportShowcaseKey,
+  ];
+}
+
+List<GlobalKey> buildStockModalTutorialSteps({
+  required GlobalKey iconShowcaseKey,
+  required GlobalKey medicineNameShowcaseKey,
+  required GlobalKey lowStockShowcaseKey,
+  required GlobalKey expiryDateShowcaseKey,
+  required GlobalKey currentStockShowcaseKey,
+  required GlobalKey saveShowcaseKey,
+}) {
+  return <GlobalKey>[
+    iconShowcaseKey,
+    medicineNameShowcaseKey,
+    lowStockShowcaseKey,
+    expiryDateShowcaseKey,
+    currentStockShowcaseKey,
+    saveShowcaseKey,
   ];
 }
 

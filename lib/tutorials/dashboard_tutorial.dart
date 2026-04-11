@@ -4,7 +4,12 @@ import 'package:showcaseview/showcaseview.dart';
 
 import 'package:meditrack/tutorials/tutorial_preferences.dart';
 
-enum DashboardHelpSection { dashboardOverview, addSchedule, manageStocks }
+enum DashboardHelpSection {
+  dashboardOverview,
+  addSchedule,
+  manageStocks,
+  addMedicationStock,
+}
 
 List<GlobalKey> buildDashboardTutorialSteps({
   required GlobalKey titleShowcaseKey,
@@ -66,6 +71,8 @@ String dashboardHelpSectionTitle(DashboardHelpSection section) {
       return 'Adding a medication schedule';
     case DashboardHelpSection.manageStocks:
       return 'Managing medication stocks';
+    case DashboardHelpSection.addMedicationStock:
+      return 'Adding medication stock';
   }
 }
 

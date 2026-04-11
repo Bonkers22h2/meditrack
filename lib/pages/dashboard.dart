@@ -35,8 +35,15 @@ class MeditrackApp extends StatelessWidget {
 }
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key, this.showFirstLoginSectionsPopup = false});
+  const DashboardScreen({
+    super.key,
+    this.showFirstLoginSectionsPopup = false,
+    this.initialTabIndex = 0,
+    this.startAddMedicationTutorial = false,
+  });
   final bool showFirstLoginSectionsPopup;
+  final int initialTabIndex;
+  final bool startAddMedicationTutorial;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -44,6 +51,8 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedTabIndex = 0;
+  bool _startStockTutorialOnNextBuild = false;
+  bool _startAddMedicationTutorialOnNextBuild = false;
   static const String _takenRemindersStorageKey = 'taken_reminders_v1';
   static const String _deductedRemindersStorageKey = 'deducted_reminders_v1';
 
@@ -89,6 +98,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
+    _selectedTabIndex = widget.initialTabIndex;
+    _startAddMedicationTutorialOnNextBuild = widget.startAddMedicationTutorial;
     _loadMedicines();
     _loadStocks();
     _loadReminderCompletionState();
@@ -136,6 +147,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
     await _startDashboardTutorialIfNeeded();
   }
 
+  void _showStockTab({
+    bool startTutorial = false,
+    bool startAddMedicationTutorial = false,
+  }) {
+    setState(() {
+      _selectedTabIndex = 1;
+      _startStockTutorialOnNextBuild = startTutorial;
+      _startAddMedicationTutorialOnNextBuild = startAddMedicationTutorial;
+    });
+  }
+
   Future<void> _openHelpSectionsPopup() async {
     final DashboardHelpSection? selectedSection =
         await showDashboardHelpSectionsPopup(
@@ -162,11 +184,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _openMedicineModal(startScheduleTutorial: true);
           break;
         case DashboardHelpSection.manageStocks:
+          _showStockTab(startTutorial: true);
+          break;
+        case DashboardHelpSection.addMedicationStock:
           Navigator.of(context)
               .push(
                 MaterialPageRoute<void>(
-                  builder: (BuildContext context) =>
-                      const StockScreen(startTutorial: true),
+                  builder: (BuildContext context) => DashboardScreen(
+                    initialTabIndex: 1,
+                    startAddMedicationTutorial: true,
+                  ),
                 ),
               )
               .then((_) => _loadStocks());
@@ -573,8 +600,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           )
         : _selectedTabIndex == 1
-        ? const StockScreen()
-        : const ReportsScreen();
+        ? StockScreen(
+            startTutorial: _startStockTutorialOnNextBuild,
+            startAddMedicationTutorial:
+                _startAddMedicationTutorialOnNextBuild,
+            onStockTutorialLaunched: () {
+              if (!_startStockTutorialOnNextBuild || !mounted) {
+                return;
+              }
+              setState(() {
+                _startStockTutorialOnNextBuild = false;
+              });
+            },
+            onAddMedicationTutorialLaunched: () {
+              if (!_startAddMedicationTutorialOnNextBuild || !mounted) {
+                return;
+              }
+              setState(() {
+                _startAddMedicationTutorialOnNextBuild = false;
+              });
+            },
+            onHelpPressed: _openHelpSectionsPopup,
+          )
+        : ReportsScreen(onHelpPressed: _openHelpSectionsPopup);
 
     return Scaffold(
       backgroundColor: backgroundColor,

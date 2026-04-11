@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:meditrack/services/medicine_icons.dart';
 import 'package:meditrack/services/stock_storage.dart';
+import 'package:meditrack/tutorials/stock_tutorial.dart';
+import 'package:showcaseview/showcaseview.dart';
 
 class StockEditModal extends StatefulWidget {
   final StockRecord? initialRecord;
@@ -10,6 +12,7 @@ class StockEditModal extends StatefulWidget {
   final int initialStock;
   final int lowStockThreshold;
   final DateTime? initialExpiryDate;
+  final bool startTutorial;
 
   const StockEditModal({
     super.key,
@@ -18,6 +21,7 @@ class StockEditModal extends StatefulWidget {
     this.initialStock = 7,
     this.lowStockThreshold = 4,
     this.initialExpiryDate,
+    this.startTutorial = false,
   });
 
   @override
@@ -25,6 +29,13 @@ class StockEditModal extends StatefulWidget {
 }
 
 class _StockEditModalState extends State<StockEditModal> {
+  final GlobalKey _iconShowcaseKey = GlobalKey();
+  final GlobalKey _medicineNameShowcaseKey = GlobalKey();
+  final GlobalKey _lowStockShowcaseKey = GlobalKey();
+  final GlobalKey _expiryDateShowcaseKey = GlobalKey();
+  final GlobalKey _currentStockShowcaseKey = GlobalKey();
+  final GlobalKey _saveShowcaseKey = GlobalKey();
+
   late int _currentStock;
   late final TextEditingController _medicineNameController;
   late final TextEditingController _lowStockController;
@@ -67,6 +78,29 @@ class _StockEditModalState extends State<StockEditModal> {
     );
     _selectedIconKey = initialRecord?.iconKey ?? MedicineIcons.defaultIconKey;
     _selectedExpiryDate = initialRecord?.expiryDate ?? widget.initialExpiryDate;
+    if (widget.startTutorial) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+        _startStockModalTutorial();
+      });
+    }
+  }
+
+  Future<void> _startStockModalTutorial() async {
+    await startStockTutorial(
+      context: context,
+      isMounted: () => mounted,
+      steps: buildStockModalTutorialSteps(
+        iconShowcaseKey: _iconShowcaseKey,
+        medicineNameShowcaseKey: _medicineNameShowcaseKey,
+        lowStockShowcaseKey: _lowStockShowcaseKey,
+        expiryDateShowcaseKey: _expiryDateShowcaseKey,
+        currentStockShowcaseKey: _currentStockShowcaseKey,
+        saveShowcaseKey: _saveShowcaseKey,
+      ),
+    );
   }
 
   @override
@@ -287,19 +321,25 @@ class _StockEditModalState extends State<StockEditModal> {
               Stack(
                 alignment: Alignment.topCenter,
                 children: [
-                  GestureDetector(
-                    onTap: _showIconPicker,
-                    child: Container(
-                      width: 150,
-                      height: 150,
-                      decoration: BoxDecoration(
-                        color: circlePlaceholderColor,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        MedicineIcons.resolve(_selectedIconKey),
-                        size: 70,
-                        color: const Color(0xFF6F6F6F),
+                  Showcase(
+                    key: _iconShowcaseKey,
+                    title: 'Choose icon',
+                    description:
+                        'Tap this icon area to pick the medicine icon for stock tracking.',
+                    child: GestureDetector(
+                      onTap: _showIconPicker,
+                      child: Container(
+                        width: 150,
+                        height: 150,
+                        decoration: BoxDecoration(
+                          color: circlePlaceholderColor,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          MedicineIcons.resolve(_selectedIconKey),
+                          size: 70,
+                          color: const Color(0xFF6F6F6F),
+                        ),
                       ),
                     ),
                   ),
@@ -325,24 +365,30 @@ class _StockEditModalState extends State<StockEditModal> {
                 label: const Text('Edit icon'),
               ),
               const SizedBox(height: 20),
-              TextField(
-                controller: _medicineNameController,
-                autofocus: false,
-                textAlign: TextAlign.center,
-                decoration: InputDecoration(
-                  hintText: 'e.g., Paracetamol 500mg',
-                  border: InputBorder.none,
-                  hintStyle: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w400,
-                    color: textDark.withValues(alpha: 0.45),
+              Showcase(
+                key: _medicineNameShowcaseKey,
+                title: 'Enter medicine name',
+                description:
+                    'Type the medicine name here so it can be matched with reminders and reports.',
+                child: TextField(
+                  controller: _medicineNameController,
+                  autofocus: false,
+                  textAlign: TextAlign.center,
+                  decoration: InputDecoration(
+                    hintText: 'e.g., Paracetamol 500mg',
+                    border: InputBorder.none,
+                    hintStyle: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w400,
+                      color: textDark.withValues(alpha: 0.45),
+                    ),
                   ),
-                ),
-                style: TextStyle(
-                  fontSize: 34,
-                  fontWeight: FontWeight.w400,
-                  color: textDark,
-                  letterSpacing: -0.5,
+                  style: TextStyle(
+                    fontSize: 34,
+                    fontWeight: FontWeight.w400,
+                    color: textDark,
+                    letterSpacing: -0.5,
+                  ),
                 ),
               ),
               Text(
@@ -373,13 +419,25 @@ class _StockEditModalState extends State<StockEditModal> {
                 ),
               ),
               const SizedBox(height: 24),
-              _buildDetailInputRow(
-                label: 'Low Stock:',
-                controller: _lowStockController,
-                keyboardType: TextInputType.number,
+              Showcase(
+                key: _lowStockShowcaseKey,
+                title: 'Set low-stock threshold',
+                description:
+                    'This number controls when the app flags a medicine as low stock.',
+                child: _buildDetailInputRow(
+                  label: 'Low Stock:',
+                  controller: _lowStockController,
+                  keyboardType: TextInputType.number,
+                ),
               ),
               const SizedBox(height: 12),
-              _buildDateRow(),
+              Showcase(
+                key: _expiryDateShowcaseKey,
+                title: 'Set expiry date',
+                description:
+                    'Choose the expiration date so expired medicines are highlighted automatically.',
+                child: _buildDateRow(),
+              ),
               if (expiryText != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 8.0, left: 90),
@@ -415,85 +473,97 @@ class _StockEditModalState extends State<StockEditModal> {
                   ),
                 ),
               ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  IconButton(
-                    icon: const Icon(
-                      Icons.remove,
-                      size: 36,
-                      color: Colors.black87,
+              Showcase(
+                key: _currentStockShowcaseKey,
+                title: 'Set current stock count',
+                description:
+                    'Use minus, plus, or direct input to set how many doses are currently available.',
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    IconButton(
+                      icon: const Icon(
+                        Icons.remove,
+                        size: 36,
+                        color: Colors.black87,
+                      ),
+                      onPressed: _decrementStock,
                     ),
-                    onPressed: _decrementStock,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Align(
-                      alignment: Alignment.center,
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 120),
-                        child: TextField(
-                          controller: _currentStockController,
-                          autofocus: false,
-                          keyboardType: TextInputType.number,
-                          textInputAction: TextInputAction.done,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                          ],
-                          textAlign: TextAlign.center,
-                          onChanged: (value) {
-                            final int? parsed = int.tryParse(value);
-                            setState(() {
-                              _currentStock = parsed ?? 0;
-                            });
-                          },
-                          decoration: const InputDecoration(
-                            border: InputBorder.none,
-                            isDense: true,
-                            contentPadding: EdgeInsets.zero,
-                          ),
-                          style: TextStyle(
-                            fontSize: 64,
-                            fontWeight: FontWeight.w500,
-                            fontStyle: FontStyle.italic,
-                            color: textDark,
-                            height: 1.1,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Align(
+                        alignment: Alignment.center,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 120),
+                          child: TextField(
+                            controller: _currentStockController,
+                            autofocus: false,
+                            keyboardType: TextInputType.number,
+                            textInputAction: TextInputAction.done,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                            ],
+                            textAlign: TextAlign.center,
+                            onChanged: (value) {
+                              final int? parsed = int.tryParse(value);
+                              setState(() {
+                                _currentStock = parsed ?? 0;
+                              });
+                            },
+                            decoration: const InputDecoration(
+                              border: InputBorder.none,
+                              isDense: true,
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                            style: TextStyle(
+                              fontSize: 64,
+                              fontWeight: FontWeight.w500,
+                              fontStyle: FontStyle.italic,
+                              color: textDark,
+                              height: 1.1,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  IconButton(
-                    icon: const Icon(
-                      Icons.add,
-                      size: 36,
-                      color: Colors.black87,
+                    const SizedBox(width: 12),
+                    IconButton(
+                      icon: const Icon(
+                        Icons.add,
+                        size: 36,
+                        color: Colors.black87,
+                      ),
+                      onPressed: _incrementStock,
                     ),
-                    onPressed: _incrementStock,
-                  ),
-                ],
+                  ],
+                ),
               ),
               const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: ElevatedButton(
-                  onPressed: _saveStock,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: saveBtnBgColor,
-                    foregroundColor: textDark,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+              Showcase(
+                key: _saveShowcaseKey,
+                title: 'Save stock entry',
+                description:
+                    'After filling out details, tap Save to add this medicine to stock tracking.',
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton(
+                    onPressed: _saveStock,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: saveBtnBgColor,
+                      foregroundColor: textDark,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
                     ),
-                  ),
-                  child: const Text(
-                    'SAVE',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 1.0,
+                    child: const Text(
+                      'SAVE',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.0,
+                      ),
                     ),
                   ),
                 ),

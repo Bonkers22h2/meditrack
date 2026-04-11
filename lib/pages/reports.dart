@@ -11,12 +11,14 @@ class ReportsScreen extends StatefulWidget {
     this.patientLabel,
     this.takenRemindersStorageKey = 'taken_reminders_v1',
     this.title = 'Adherence Report',
+    this.onHelpPressed,
   });
 
   final String? patientId;
   final String? patientLabel;
   final String takenRemindersStorageKey;
   final String title;
+  final VoidCallback? onHelpPressed;
 
   @override
   State<ReportsScreen> createState() => _ReportsScreenState();
@@ -406,33 +408,62 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         fit: BoxFit.contain,
                       ),
                     ),
-                    Container(
-                      width: 52,
-                      height: 52,
-                      decoration: BoxDecoration(
-                        color: cardColor,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.04),
-                            blurRadius: 12,
-                            offset: const Offset(0, 5),
+                    Row(
+                      children: [
+                        Container(
+                          width: 52,
+                          height: 52,
+                          decoration: BoxDecoration(
+                            color: cardColor,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.04),
+                                blurRadius: 12,
+                                offset: const Offset(0, 5),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                      child: IconButton(
-                        icon: Icon(Icons.settings, color: textDark, size: 24),
-                        onPressed: () {
-                          showModalBottomSheet(
-                            context: context,
-                            isScrollControlled: true,
-                            useSafeArea: true,
-                            backgroundColor: Colors.transparent,
-                            builder: (BuildContext context) =>
-                                const SettingsModal(),
-                          );
-                        },
-                      ),
+                          child: IconButton(
+                            tooltip: 'Help Center',
+                            icon: Icon(
+                              Icons.help_outline,
+                              color: textDark,
+                              size: 24,
+                            ),
+                            onPressed: widget.onHelpPressed,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Container(
+                          width: 52,
+                          height: 52,
+                          decoration: BoxDecoration(
+                            color: cardColor,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.04),
+                                blurRadius: 12,
+                                offset: const Offset(0, 5),
+                              ),
+                            ],
+                          ),
+                          child: IconButton(
+                            icon: Icon(Icons.settings, color: textDark, size: 24),
+                            onPressed: () {
+                              showModalBottomSheet(
+                                context: context,
+                                isScrollControlled: true,
+                                useSafeArea: true,
+                                backgroundColor: Colors.transparent,
+                                builder: (BuildContext context) =>
+                                    const SettingsModal(),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
