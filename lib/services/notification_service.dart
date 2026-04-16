@@ -15,7 +15,8 @@ class NotificationService {
 
   static bool _initialized = false;
   static const int _escalationAttempts = 3;
-  static const int _continuousLevel3Retries = 0;
+  // After levels 1 and 2, keep the level 3 urgent reminder visible 5 times total.
+  static const int _continuousLevel3Retries = 4;
   static const int _totalReminderAttempts =
       _escalationAttempts + _continuousLevel3Retries;
   static const Duration _escalationInterval = Duration(minutes: 2);
