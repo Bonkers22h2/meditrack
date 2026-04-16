@@ -183,7 +183,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
           missed += 1;
         }
 
-        final String medicineId = reminder.medicine.createdAt.toIso8601String();
+        final String medicineId = _medicineGroupingKey(reminder.medicine);
         final _MedicineStatsBuilder builder = medicineStats.putIfAbsent(
           medicineId,
           () => _MedicineStatsBuilder(name: reminder.medicine.name),
@@ -340,6 +340,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   bool _isSameDay(DateTime a, DateTime b) {
     return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  String _medicineGroupingKey(MedicineRecord medicine) {
+    final String normalizedName = medicine.name.trim().toLowerCase();
+    final String normalizedPatientId = (medicine.patientId ?? '').trim();
+    return '$normalizedPatientId::$normalizedName';
   }
 
   String _adherenceMessage(int percent) {
