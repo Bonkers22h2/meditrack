@@ -141,6 +141,46 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
     return int.tryParse(match.group(0)!) ?? 1;
   }
 
+  void _showPatientSnackBar(
+    String message, {
+    Color background = const Color(0xFFEF6C00),
+    IconData icon = Icons.info_outline,
+  }) {
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          elevation: 10,
+          backgroundColor: background,
+          margin: const EdgeInsets.fromLTRB(18, 0, 18, 22),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+          duration: const Duration(seconds: 3),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(22),
+          ),
+          content: Row(
+            children: [
+              Icon(icon, color: Colors.white, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  message,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    height: 1.35,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+  }
+
   Future<void> _markReminderAsTaken(MedicineRecord reminder) async {
     final DateTime today = DateTime.now();
     if (!_isSameDay(_selectedDate, today)) {
@@ -158,12 +198,55 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('This medicine is expired and cannot be used.'),
-        ),
+      _showPatientSnackBar(
+        'This medicine is expired and cannot be used.',
+        background: const Color(0xFFC62828),
+        icon: Icons.warning_amber_rounded,
       );
       return;
+    }
+
+    final int doseCount = _extractDoseCount(reminder.doseAmount);
+    if (!_deductedReminderKeys.contains(reminderKey)) {
+      final int availableStock =
+          await StockStorage.getAvailableStockForMedicine(
+            medicineName: reminder.name,
+          );
+      if (availableStock < doseCount) {
+        if (!mounted) {
+          return;
+        }
+        _showPatientSnackBar(
+          'Not enough stock for ${reminder.name}. Need $doseCount, available $availableStock.',
+          background: const Color(0xFFEF6C00),
+          icon: Icons.inventory_2_outlined,
+        );
+        return;
+      }
+
+      final bool deducted = await StockStorage.deductStockForMedicine(
+        medicineName: reminder.name,
+        amount: doseCount,
+      );
+      if (!deducted) {
+        if (!mounted) {
+          return;
+        }
+        _showPatientSnackBar(
+          'Unable to deduct stock. Please try again.',
+          background: const Color(0xFFC62828),
+          icon: Icons.error_outline,
+        );
+        return;
+      }
+
+      if (mounted) {
+        setState(() {
+          _deductedReminderKeys.add(reminderKey);
+        });
+      } else {
+        _deductedReminderKeys.add(reminderKey);
+      }
     }
 
     if (!mounted) {
@@ -188,23 +271,6 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
       medicineCreatedAtMillis: reminder.createdAt.millisecondsSinceEpoch,
       scheduledAt: scheduledAt,
     ).catchError((_) {});
-
-    final int doseCount = _extractDoseCount(reminder.doseAmount);
-    if (!_deductedReminderKeys.contains(reminderKey)) {
-      final bool deducted = await StockStorage.deductStockForMedicine(
-        medicineName: reminder.name,
-        amount: doseCount,
-      );
-      if (deducted) {
-        if (mounted) {
-          setState(() {
-            _deductedReminderKeys.add(reminderKey);
-          });
-        } else {
-          _deductedReminderKeys.add(reminderKey);
-        }
-      }
-    }
 
     await _persistReminderCompletionState();
   }
