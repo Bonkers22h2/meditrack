@@ -510,6 +510,53 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
       return;
     }
 
+    final int doseCount = _extractDoseCount(reminder.medicine.doseAmount);
+    if (!_deductedReminderKeys.contains(storageKey)) {
+      final int availableStock =
+          await StockStorage.getAvailableStockForMedicine(
+            medicineName: reminder.medicine.name,
+          );
+      if (availableStock < doseCount) {
+        if (!mounted) {
+          return;
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Not enough stock for ${reminder.medicine.name}. Need $doseCount, available $availableStock.',
+            ),
+          ),
+        );
+        return;
+      }
+    }
+
+    bool deducted = false;
+    if (!_deductedReminderKeys.contains(storageKey)) {
+      deducted = await StockStorage.deductStockForMedicine(
+        medicineName: reminder.medicine.name,
+        amount: doseCount,
+      );
+      if (!deducted) {
+        if (!mounted) {
+          return;
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Unable to deduct stock. Please try again.'),
+          ),
+        );
+        return;
+      }
+      if (mounted) {
+        setState(() {
+          _deductedReminderKeys.add(storageKey);
+        });
+      } else {
+        _deductedReminderKeys.add(storageKey);
+      }
+    }
+
     if (!mounted) {
       return;
     }
@@ -519,23 +566,6 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
     await _persistReminderCompletionState();
     await _cancelReminderNotifications(reminder);
 
-    final int doseCount = _extractDoseCount(reminder.medicine.doseAmount);
-    bool deducted = false;
-    if (!_deductedReminderKeys.contains(storageKey)) {
-      deducted = await StockStorage.deductStockForMedicine(
-        medicineName: reminder.medicine.name,
-        amount: doseCount,
-      );
-      if (deducted) {
-        if (mounted) {
-          setState(() {
-            _deductedReminderKeys.add(storageKey);
-          });
-        } else {
-          _deductedReminderKeys.add(storageKey);
-        }
-      }
-    }
     await _persistReminderCompletionState();
 
     if (!mounted) {

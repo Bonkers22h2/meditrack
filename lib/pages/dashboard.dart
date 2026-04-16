@@ -320,6 +320,59 @@ class _DashboardScreenState extends State<DashboardScreen> {
       return;
     }
 
+    final int doseCount = _extractDoseCount(reminder.medicine.doseAmount);
+    if (!_deductedReminderKeys.contains(storageKey)) {
+      final int availableStock =
+          await StockStorage.getAvailableStockForMedicine(
+            medicineName: reminder.medicine.name,
+          );
+      if (availableStock < doseCount) {
+        if (!mounted) {
+          return;
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Not enough stock for ${reminder.medicine.name}. Need $doseCount, available $availableStock.',
+            ),
+            backgroundColor: Colors.orange.shade800,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        );
+        return;
+      }
+    }
+
+    bool deducted = false;
+    if (!_deductedReminderKeys.contains(storageKey)) {
+      deducted = await StockStorage.deductStockForMedicine(
+        medicineName: reminder.medicine.name,
+        amount: doseCount,
+      );
+      if (!deducted) {
+        if (!mounted) {
+          return;
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Unable to deduct stock. Please try again.'),
+          ),
+        );
+        return;
+      }
+      if (mounted) {
+        setState(() {
+          _deductedReminderKeys.add(storageKey);
+        });
+      } else {
+        _deductedReminderKeys.add(storageKey);
+      }
+      unawaited(_loadStocks());
+    }
+
     if (!mounted) {
       return;
     }
@@ -341,24 +394,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       scheduledAt: scheduledAt,
     ).catchError((_) {});
 
-    final int doseCount = _extractDoseCount(reminder.medicine.doseAmount);
-    bool deducted = false;
-    if (!_deductedReminderKeys.contains(storageKey)) {
-      deducted = await StockStorage.deductStockForMedicine(
-        medicineName: reminder.medicine.name,
-        amount: doseCount,
-      );
-      if (deducted) {
-        if (mounted) {
-          setState(() {
-            _deductedReminderKeys.add(storageKey);
-          });
-        } else {
-          _deductedReminderKeys.add(storageKey);
-        }
-        unawaited(_loadStocks());
-      }
-    }
     await _persistReminderCompletionState();
 
     if (!mounted) {
@@ -602,8 +637,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         : _selectedTabIndex == 1
         ? StockScreen(
             startTutorial: _startStockTutorialOnNextBuild,
-            startAddMedicationTutorial:
-                _startAddMedicationTutorialOnNextBuild,
+            startAddMedicationTutorial: _startAddMedicationTutorialOnNextBuild,
             onStockTutorialLaunched: () {
               if (!_startStockTutorialOnNextBuild || !mounted) {
                 return;

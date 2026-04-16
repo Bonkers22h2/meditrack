@@ -154,6 +154,27 @@ class StockStorage {
     await saveStocks(stocks);
   }
 
+  static Future<int> getAvailableStockForMedicine({
+    required String medicineName,
+  }) async {
+    final String normalizedName = medicineName.trim().toLowerCase();
+    if (normalizedName.isEmpty) {
+      return 0;
+    }
+
+    final List<StockRecord> stocks = await loadStocks();
+    final int index = stocks.indexWhere(
+      (StockRecord stock) =>
+          stock.medicineName.trim().toLowerCase() == normalizedName,
+    );
+
+    if (index < 0) {
+      return 0;
+    }
+
+    return stocks[index].currentStock;
+  }
+
   static Future<bool> deductStockForMedicine({
     required String medicineName,
     required int amount,
