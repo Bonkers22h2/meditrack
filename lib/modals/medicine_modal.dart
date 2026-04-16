@@ -1,4 +1,6 @@
 // modals/medicine_modal.dart
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:meditrack/services/medicine_icons.dart';
@@ -1100,8 +1102,10 @@ class _MedicineModalState extends State<MedicineModal> {
         }
       }
 
-      await _scheduleNotificationsInBackground(recordsToSave);
-      if (mounted) Navigator.pop(context, true);
+      if (mounted) {
+        Navigator.pop(context, true);
+      }
+      unawaited(_scheduleNotificationsInBackground(recordsToSave));
     } catch (e) {
       _showSnackBar('Error saving: $e');
     } finally {
@@ -1113,66 +1117,93 @@ class _MedicineModalState extends State<MedicineModal> {
   Future<void> _scheduleNotificationsInBackground(
     List<MedicineRecord> records,
   ) async {
-    final bool hasAccess = await NotificationService.ensureNotificationAccess();
-    if (!hasAccess) {
-      if (mounted) {
-        _showSnackBar(
-          'Saved medicine, but notifications are disabled on this device.',
-        );
-      }
-      return;
-    }
-
-    final bool hasPatientLinkedRecord = records.any(
-      (MedicineRecord record) =>
-          record.patientId != null && record.patientId!.isNotEmpty,
-    );
-
-    final Map<String, String> patientNameById = <String, String>{};
-    if (hasPatientLinkedRecord) {
-      final List<PatientRecord> patients = await PatientStorage.loadPatients();
-      for (final PatientRecord patient in patients) {
-        patientNameById[patient.createdAt.toIso8601String()] = patient.fullName;
-      }
-    }
-
-    bool hadSchedulingError = false;
-    for (final record in records) {
-      final String patientName =
-          patientNameById[record.patientId ?? '']?.trim() ?? '';
-
-      try {
-        if (record.reminderStartDate != null &&
-            record.reminderEndDate != null) {
-          await NotificationService.scheduleMedicineReminderRange(
-            medicineCreatedAtMillis: record.createdAt.millisecondsSinceEpoch,
-            medicineName: record.name,
-            startDate: record.reminderStartDate!,
-            endDate: record.reminderEndDate!,
-            hour: record.specificTime!.hour,
-            minute: record.specificTime!.minute,
-            frequency: record.frequency,
-            patientName: patientName,
-            doseAmount: record.doseAmount,
-          );
-        } else if (record.specificTime != null) {
-          await NotificationService.scheduleMedicineReminder(
-            medicineCreatedAtMillis: record.createdAt.millisecondsSinceEpoch,
-            medicineName: record.name,
-            scheduledAt: record.specificTime!,
-            patientName: patientName,
-            doseAmount: record.doseAmount,
+    try {
+      final bool hasAccess =
+          await NotificationService.ensureNotificationAccess();
+      if (!hasAccess) {
+        if (mounted) {
+          _showSnackBar(
+            'Saved medicine, but notifications are disabled on this device.',
           );
         }
-      } catch (_) {
-        hadSchedulingError = true;
+        return;
       }
-    }
 
-    if (hadSchedulingError && mounted) {
-      _showSnackBar(
-        'Saved medicine, but some reminders could not be scheduled.',
+      final bool hasPatientLinkedRecord = records.any(
+        (MedicineRecord record) =>
+            record.patientId != null && record.patientId!.isNotEmpty,
       );
+
+      final Map<String, String> patientNameById = <String, String>{};
+      if (hasPatientLinkedRecord) {
+        final List<PatientRecord> patients =
+            await PatientStorage.loadPatients();
+        for (final PatientRecord patient in patients) {
+          patientNameById[patient.createdAt.toIso8601String()] =
+              patient.fullName;
+        }
+      }
+
+      bool hadSchedulingError = false;
+      const int batchSize = 3;
+      final List<Future<void>> batch = <Future<void>>[];
+
+      for (final MedicineRecord record in records) {
+        final String patientName =
+            patientNameById[record.patientId ?? '']?.trim() ?? '';
+
+        batch.add(
+          Future<void>(() async {
+            try {
+              if (record.reminderStartDate != null &&
+                  record.reminderEndDate != null) {
+                await NotificationService.scheduleMedicineReminderRange(
+                  medicineCreatedAtMillis:
+                      record.createdAt.millisecondsSinceEpoch,
+                  medicineName: record.name,
+                  startDate: record.reminderStartDate!,
+                  endDate: record.reminderEndDate!,
+                  hour: record.specificTime!.hour,
+                  minute: record.specificTime!.minute,
+                  frequency: record.frequency,
+                  patientName: patientName,
+                  doseAmount: record.doseAmount,
+                );
+              } else if (record.specificTime != null) {
+                await NotificationService.scheduleMedicineReminder(
+                  medicineCreatedAtMillis:
+                      record.createdAt.millisecondsSinceEpoch,
+                  medicineName: record.name,
+                  scheduledAt: record.specificTime!,
+                  patientName: patientName,
+                  doseAmount: record.doseAmount,
+                );
+              }
+            } catch (_) {
+              hadSchedulingError = true;
+            }
+          }),
+        );
+
+        if (batch.length >= batchSize) {
+          await Future.wait(batch);
+          batch.clear();
+        }
+      }
+
+      if (batch.isNotEmpty) {
+        await Future.wait(batch);
+      }
+
+      if (hadSchedulingError && mounted) {
+        _showSnackBar(
+          'Saved medicine, but some reminders could not be scheduled.',
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        _showSnackBar('Saved medicine, but reminders could not be scheduled.');
+      }
     }
   }
 

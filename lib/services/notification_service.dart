@@ -10,6 +10,8 @@ import 'package:timezone/timezone.dart' as tz;
 class NotificationService {
   NotificationService._();
 
+  static const int _rangeScheduleBatchSize = 14;
+
   static final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
 
@@ -142,8 +144,10 @@ class NotificationService {
 
     DateTime cursor = normalizedStart;
     final DateTime now = DateTime.now();
+    final tz.TZDateTime nowTz = tz.TZDateTime.from(now, tz.local);
     int scheduledCount = 0;
     int idOffset = 0;
+    final List<Future<void>> batch = <Future<void>>[];
 
     // Guard against accidentally scheduling an excessively large date span.
     while (!cursor.isAfter(normalizedEnd) && idOffset < 731) {
@@ -162,25 +166,33 @@ class NotificationService {
       if (weekdayAllowed) {
         final tz.TZDateTime? scheduledDate = _coerceToFutureSchedule(
           tz.TZDateTime.from(scheduledAt, tz.local),
-          now: tz.TZDateTime.from(now, tz.local),
+          now: nowTz,
         );
-        if (scheduledDate == null) {
-          idOffset += 1;
-          cursor = cursor.add(const Duration(days: 1));
-          continue;
+        if (scheduledDate != null) {
+          batch.add(
+            _scheduleEscalatingReminder(
+              medicineCreatedAtMillis: medicineCreatedAtMillis,
+              scheduledDate: scheduledDate,
+              medicineName: medicineName,
+              patientName: patientName,
+              doseAmount: doseAmount,
+            ),
+          );
+          scheduledCount += 1;
+
+          if (batch.length >= _rangeScheduleBatchSize) {
+            await Future.wait(batch);
+            batch.clear();
+          }
         }
-        await _scheduleEscalatingReminder(
-          medicineCreatedAtMillis: medicineCreatedAtMillis,
-          scheduledDate: scheduledDate,
-          medicineName: medicineName,
-          patientName: patientName,
-          doseAmount: doseAmount,
-        );
-        scheduledCount += 1;
       }
 
       idOffset += 1;
       cursor = cursor.add(const Duration(days: 1));
+    }
+
+    if (batch.isNotEmpty) {
+      await Future.wait(batch);
     }
 
     return scheduledCount;
