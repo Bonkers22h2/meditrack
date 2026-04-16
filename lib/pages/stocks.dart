@@ -1,5 +1,6 @@
 // lib/pages/stocks.dart
 import 'package:flutter/material.dart';
+import 'package:meditrack/modals/settings_modal.dart';
 import 'package:meditrack/modals/stock_modal.dart';
 import 'package:meditrack/services/stock_storage.dart';
 import 'package:meditrack/tutorials/stock_tutorial.dart';
@@ -249,7 +250,8 @@ class _StockScreenState extends State<StockScreen> {
                             color: textLight,
                             size: 24,
                           ),
-                          onPressed: widget.onHelpPressed ?? _startStockTutorial,
+                          onPressed:
+                              widget.onHelpPressed ?? _startStockTutorial,
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -273,7 +275,16 @@ class _StockScreenState extends State<StockScreen> {
                             color: textLight,
                             size: 24,
                           ),
-                          onPressed: () {},
+                          onPressed: () {
+                            showModalBottomSheet(
+                              context: context,
+                              isScrollControlled: true,
+                              useSafeArea: true,
+                              backgroundColor: Colors.transparent,
+                              builder: (BuildContext context) =>
+                                  const SettingsModal(),
+                            );
+                          },
                         ),
                       ),
                     ],

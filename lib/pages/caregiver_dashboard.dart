@@ -814,12 +814,79 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 12),
-          SizedBox(
-            height: 40,
-            child: Image.asset(
-              'android/app/src/main/res/assets/icons (1).png',
-              fit: BoxFit.contain,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              SizedBox(
+                height: 40,
+                child: Image.asset(
+                  'android/app/src/main/res/assets/icons (1).png',
+                  fit: BoxFit.contain,
+                ),
+              ),
+              Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: cardColor,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.03),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: IconButton(
+                      tooltip: 'Help Center',
+                      icon: Icon(
+                        Icons.help_outline,
+                        color: textLight,
+                        size: 24,
+                      ),
+                      onPressed: _startCaregiverTutorial,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: cardColor,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.03),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: IconButton(
+                      tooltip: 'Caregiver options',
+                      icon: Icon(
+                        Icons.settings_outlined,
+                        color: textLight,
+                        size: 24,
+                      ),
+                      onPressed: () {
+                        showModalBottomSheet(
+                          context: context,
+                          isScrollControlled: true,
+                          useSafeArea: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (BuildContext context) =>
+                              const SettingsModal(),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
           const SizedBox(height: 16),
           Text(
@@ -1382,37 +1449,67 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
                   fit: BoxFit.contain,
                 ),
               ),
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: cardColor,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.03),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
+              Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: cardColor,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.03),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                child: IconButton(
-                  tooltip: 'Caregiver options',
-                  icon: Icon(
-                    Icons.settings_outlined,
-                    color: textLight,
-                    size: 24,
+                    child: IconButton(
+                      tooltip: 'Help Center',
+                      icon: Icon(
+                        Icons.help_outline,
+                        color: textLight,
+                        size: 24,
+                      ),
+                      onPressed: _startCaregiverTutorial,
+                    ),
                   ),
-                  onPressed: () {
-                    showModalBottomSheet(
-                      context: context,
-                      isScrollControlled: true,
-                      useSafeArea: true,
-                      backgroundColor: Colors.transparent,
-                      builder: (BuildContext context) => const SettingsModal(),
-                    );
-                  },
-                ),
+                  const SizedBox(width: 10),
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: cardColor,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.03),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: IconButton(
+                      tooltip: 'Caregiver options',
+                      icon: Icon(
+                        Icons.settings_outlined,
+                        color: textLight,
+                        size: 24,
+                      ),
+                      onPressed: () {
+                        showModalBottomSheet(
+                          context: context,
+                          isScrollControlled: true,
+                          useSafeArea: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (BuildContext context) =>
+                              const SettingsModal(),
+                        );
+                      },
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
