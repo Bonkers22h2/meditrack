@@ -820,22 +820,111 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
 
     final List<_CaregiverReminderInstance> reminders =
         _expandPatientRemindersForDate(_selectedReminderDate);
-    final Map<String, List<_CaregiverReminderInstance>> grouped =
-        <String, List<_CaregiverReminderInstance>>{
-          'Morning': <_CaregiverReminderInstance>[],
-          'Afternoon': <_CaregiverReminderInstance>[],
-          'Night': <_CaregiverReminderInstance>[],
-        };
+    final List<_CaregiverReminderInstance> uncheckedReminders =
+        <_CaregiverReminderInstance>[];
+    final List<_CaregiverReminderInstance> checkedReminders =
+        <_CaregiverReminderInstance>[];
 
     for (final _CaregiverReminderInstance reminder in reminders) {
-      final int hour = reminder.time.hour;
-      if (hour >= 5 && hour < 12) {
-        grouped['Morning']!.add(reminder);
-      } else if (hour >= 12 && hour < 18) {
-        grouped['Afternoon']!.add(reminder);
+      final String reminderKey = _reminderStorageKey(
+        reminder,
+        _selectedReminderDate,
+      );
+      if (_takenReminderKeys.contains(reminderKey)) {
+        checkedReminders.add(reminder);
       } else {
-        grouped['Night']!.add(reminder);
+        uncheckedReminders.add(reminder);
       }
+    }
+
+    Map<String, List<_CaregiverReminderInstance>> groupByPeriod(
+      List<_CaregiverReminderInstance> source,
+    ) {
+      final Map<String, List<_CaregiverReminderInstance>> grouped =
+          <String, List<_CaregiverReminderInstance>>{
+            'Morning': <_CaregiverReminderInstance>[],
+            'Afternoon': <_CaregiverReminderInstance>[],
+            'Night': <_CaregiverReminderInstance>[],
+          };
+
+      for (final _CaregiverReminderInstance reminder in source) {
+        final int hour = reminder.time.hour;
+        if (hour >= 5 && hour < 12) {
+          grouped['Morning']!.add(reminder);
+        } else if (hour >= 12 && hour < 18) {
+          grouped['Afternoon']!.add(reminder);
+        } else {
+          grouped['Night']!.add(reminder);
+        }
+      }
+
+      return grouped;
+    }
+
+    List<Widget> buildReminderSection({
+      required String title,
+      required List<_CaregiverReminderInstance> source,
+      required Color titleColor,
+    }) {
+      final Map<String, List<_CaregiverReminderInstance>> grouped =
+          groupByPeriod(source);
+      final List<Widget> section = <Widget>[
+        Padding(
+          padding: const EdgeInsets.only(top: 12, bottom: 8, left: 4),
+          child: Text(
+            title,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: titleColor,
+            ),
+          ),
+        ),
+      ];
+
+      if (source.isEmpty) {
+        section.add(
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 8),
+            child: Text(
+              'No reminders in this section.',
+              style: TextStyle(
+                color: textFaint,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        );
+        return section;
+      }
+
+      for (final String period in <String>['Morning', 'Afternoon', 'Night']) {
+        if (grouped[period]!.isEmpty) {
+          continue;
+        }
+        section.add(
+          Padding(
+            padding: const EdgeInsets.only(top: 8, bottom: 8, left: 4),
+            child: Text(
+              period,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: textDark,
+              ),
+            ),
+          ),
+        );
+        section.addAll(
+          grouped[period]!.map(
+            (_CaregiverReminderInstance reminder) =>
+                _buildCaregiverReminderCard(reminder),
+          ),
+        );
+      }
+
+      return section;
     }
 
     return Padding(
@@ -948,6 +1037,15 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
               fontWeight: FontWeight.w600,
             ),
           ),
+          const SizedBox(height: 4),
+          Text(
+            '${uncheckedReminders.length} not checked • ${checkedReminders.length} checked',
+            style: TextStyle(
+              color: textFaint,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
           const SizedBox(height: 10),
           Expanded(
             child: reminders.isEmpty
@@ -963,32 +1061,17 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
                   )
                 : ListView(
                     children: [
-                      for (final String period in <String>[
-                        'Morning',
-                        'Afternoon',
-                        'Night',
-                      ])
-                        if (grouped[period]!.isNotEmpty) ...[
-                          Padding(
-                            padding: const EdgeInsets.only(
-                              top: 12,
-                              bottom: 8,
-                              left: 4,
-                            ),
-                            child: Text(
-                              period,
-                              style: TextStyle(
-                                fontSize: 19,
-                                fontWeight: FontWeight.bold,
-                                color: textDark,
-                              ),
-                            ),
-                          ),
-                          ...grouped[period]!.map(
-                            (_CaregiverReminderInstance reminder) =>
-                                _buildCaregiverReminderCard(reminder),
-                          ),
-                        ],
+                      ...buildReminderSection(
+                        title: 'Not Checked',
+                        source: uncheckedReminders,
+                        titleColor: const Color(0xFF6A784E),
+                      ),
+                      const SizedBox(height: 8),
+                      ...buildReminderSection(
+                        title: 'Checked',
+                        source: checkedReminders,
+                        titleColor: const Color(0xFF4E8A58),
+                      ),
                     ],
                   ),
           ),
