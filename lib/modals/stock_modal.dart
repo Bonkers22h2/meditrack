@@ -42,6 +42,7 @@ class _StockEditModalState extends State<StockEditModal> {
   late final TextEditingController _currentStockController;
   String _selectedIconKey = MedicineIcons.defaultIconKey;
   DateTime? _selectedExpiryDate;
+  String? _inlineValidationError;
 
   // Colors based on the provided design
   final Color modalBgColor = const Color(0xFFF7F7F4);
@@ -76,6 +77,9 @@ class _StockEditModalState extends State<StockEditModal> {
     _currentStockController = TextEditingController(
       text: _currentStock.toString(),
     );
+    _medicineNameController.addListener(_clearInlineValidationError);
+    _lowStockController.addListener(_clearInlineValidationError);
+    _currentStockController.addListener(_clearInlineValidationError);
     _selectedIconKey = initialRecord?.iconKey ?? MedicineIcons.defaultIconKey;
     _selectedExpiryDate = initialRecord?.expiryDate ?? widget.initialExpiryDate;
     if (widget.startTutorial) {
@@ -105,16 +109,29 @@ class _StockEditModalState extends State<StockEditModal> {
 
   @override
   void dispose() {
+    _medicineNameController.removeListener(_clearInlineValidationError);
+    _lowStockController.removeListener(_clearInlineValidationError);
+    _currentStockController.removeListener(_clearInlineValidationError);
     _medicineNameController.dispose();
     _lowStockController.dispose();
     _currentStockController.dispose();
     super.dispose();
   }
 
+  void _clearInlineValidationError() {
+    if (_inlineValidationError == null || !mounted) {
+      return;
+    }
+    setState(() {
+      _inlineValidationError = null;
+    });
+  }
+
   void _incrementStock() {
     setState(() {
       _currentStock++;
       _currentStockController.text = _currentStock.toString();
+      _inlineValidationError = null;
     });
   }
 
@@ -123,6 +140,7 @@ class _StockEditModalState extends State<StockEditModal> {
       setState(() {
         _currentStock--;
         _currentStockController.text = _currentStock.toString();
+        _inlineValidationError = null;
       });
     }
   }
@@ -142,6 +160,7 @@ class _StockEditModalState extends State<StockEditModal> {
     if (picked != null) {
       setState(() {
         _selectedExpiryDate = picked;
+        _inlineValidationError = null;
       });
     }
   }
@@ -152,18 +171,37 @@ class _StockEditModalState extends State<StockEditModal> {
     final int? currentStock = int.tryParse(_currentStockController.text.trim());
 
     if (medicineName.isEmpty) {
-      _showError('Medicine name is required.');
+      setState(() {
+        _inlineValidationError = 'Medicine name is required.';
+      });
       return;
     }
 
     if (lowStock == null || lowStock < 0) {
-      _showError('Low stock threshold must be a valid number.');
+      setState(() {
+        _inlineValidationError = 'Low stock threshold must be a valid number.';
+      });
       return;
     }
 
     if (currentStock == null || currentStock < 0) {
-      _showError('Current stock must be a valid number.');
+      setState(() {
+        _inlineValidationError = 'Current stock must be a valid number.';
+      });
       return;
+    }
+
+    if (_selectedExpiryDate == null) {
+      setState(() {
+        _inlineValidationError = 'Expiry date is required.';
+      });
+      return;
+    }
+
+    if (_inlineValidationError != null) {
+      setState(() {
+        _inlineValidationError = null;
+      });
     }
 
     _currentStock = currentStock;
@@ -178,12 +216,6 @@ class _StockEditModalState extends State<StockEditModal> {
     );
 
     Navigator.pop(context, result);
-  }
-
-  void _showError(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   String _formatDate(DateTime? date) {
@@ -539,6 +571,46 @@ class _StockEditModalState extends State<StockEditModal> {
                 ),
               ),
               const SizedBox(height: 24),
+              if (_inlineValidationError != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFEBEE),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFE57373)),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Padding(
+                          padding: EdgeInsets.only(top: 1),
+                          child: Icon(
+                            Icons.error_outline,
+                            size: 18,
+                            color: Color(0xFFC62828),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _inlineValidationError!,
+                            style: const TextStyle(
+                              color: Color(0xFFB71C1C),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               Showcase(
                 key: _saveShowcaseKey,
                 title: 'Save stock entry',

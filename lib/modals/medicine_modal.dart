@@ -58,6 +58,7 @@ class _MedicineModalState extends State<MedicineModal> {
   );
   String _selectedIconKey = MedicineIcons.defaultIconKey;
   bool _isSaving = false;
+  String? _inlineValidationError;
   List<String> _selectedMedicines = <String>[];
   List<String> _stockMedicineNames = <String>[];
   Map<String, int> _stockCountByMedicine = <String, int>{};
@@ -77,6 +78,9 @@ class _MedicineModalState extends State<MedicineModal> {
     super.initState();
     _frequencyCountController.text = '24';
     _frequencyCountController.addListener(_onIntervalChanged);
+    _medicineInputController.addListener(_clearInlineValidationError);
+    _doseAmountController.addListener(_clearInlineValidationError);
+    _frequencyCountController.addListener(_clearInlineValidationError);
     _populateInitialValues();
     _loadMedicineNamesFromStocks();
     if (widget.startScheduleTutorial) {
@@ -92,10 +96,22 @@ class _MedicineModalState extends State<MedicineModal> {
   @override
   void dispose() {
     _frequencyCountController.removeListener(_onIntervalChanged);
+    _medicineInputController.removeListener(_clearInlineValidationError);
+    _doseAmountController.removeListener(_clearInlineValidationError);
+    _frequencyCountController.removeListener(_clearInlineValidationError);
     _medicineInputController.dispose();
     _doseAmountController.dispose();
     _frequencyCountController.dispose();
     super.dispose();
+  }
+
+  void _clearInlineValidationError() {
+    if (_inlineValidationError == null || !mounted) {
+      return;
+    }
+    setState(() {
+      _inlineValidationError = null;
+    });
   }
 
   void _onIntervalChanged() {
@@ -269,6 +285,46 @@ class _MedicineModalState extends State<MedicineModal> {
                       child: _buildCurrentTabContent(),
                     ),
                   ),
+                  if (_inlineValidationError != null)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 6, 24, 0),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFEBEE),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFE57373)),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Padding(
+                              padding: EdgeInsets.only(top: 1),
+                              child: Icon(
+                                Icons.error_outline,
+                                size: 18,
+                                color: Color(0xFFC62828),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _inlineValidationError!,
+                                style: const TextStyle(
+                                  color: Color(0xFFB71C1C),
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
                     child: Row(
@@ -927,7 +983,9 @@ class _MedicineModalState extends State<MedicineModal> {
       }
     }
     if (_selectedMedicines.isEmpty) {
-      _showSnackBar('Add at least one medication first.');
+      setState(() {
+        _inlineValidationError = 'Add at least one medication first.';
+      });
       return;
     }
 
@@ -935,22 +993,44 @@ class _MedicineModalState extends State<MedicineModal> {
     final String hoursText = _frequencyCountController.text.trim();
     final double? hours = double.tryParse(hoursText);
 
-    if (doseText.isEmpty || hours == null || _reminderTime == null) {
-      _showSnackBar('Please fill in all required fields.');
+    final List<String> missingFields = <String>[];
+    if (doseText.isEmpty) {
+      missingFields.add('Dose Amount');
+    }
+    if (hours == null) {
+      missingFields.add('Interval (hours)');
+    }
+    if (_reminderTime == null) {
+      missingFields.add('First intake time');
+    }
+
+    if (missingFields.isNotEmpty) {
+      setState(() {
+        _inlineValidationError =
+            'Please complete: ${missingFields.join(', ')}.';
+      });
       return;
     }
+
+    if (_inlineValidationError != null) {
+      setState(() {
+        _inlineValidationError = null;
+      });
+    }
+
+    final double validatedHours = hours!;
 
     setState(() => _isSaving = true);
 
     try {
       final DateTime now = DateTime.now();
       final List<MedicineRecord> recordsToSave = [];
-      final int remindersPerDay = (24 / hours).round();
+      final int remindersPerDay = (24 / validatedHours).round();
 
       // --- NEW FREQUENCY FORMATTING LOGIC ---
-      final String formattedHours = hours % 1 == 0
-          ? hours.toInt().toString()
-          : hours.toString();
+      final String formattedHours = validatedHours % 1 == 0
+          ? validatedHours.toInt().toString()
+          : validatedHours.toString();
 
       final List<String> dayLabelsFull = [
         'Sun',
@@ -1108,6 +1188,7 @@ class _MedicineModalState extends State<MedicineModal> {
       _reminderEndDate = null;
       _reminderTime = null;
       _selectedIconKey = MedicineIcons.defaultIconKey;
+      _inlineValidationError = null;
     });
   }
 
@@ -1142,6 +1223,7 @@ class _MedicineModalState extends State<MedicineModal> {
     setState(() {
       _selectedMedicines = <String>[..._selectedMedicines, name];
       _medicineInputController.clear();
+      _inlineValidationError = null;
     });
   }
 
@@ -1150,6 +1232,7 @@ class _MedicineModalState extends State<MedicineModal> {
       _selectedMedicines = _selectedMedicines
           .where((String item) => item != name)
           .toList(growable: false);
+      _inlineValidationError = null;
     });
   }
 
@@ -1184,6 +1267,7 @@ class _MedicineModalState extends State<MedicineModal> {
       } else {
         _reminderEndDate = selectedDate;
       }
+      _inlineValidationError = null;
     });
   }
 
@@ -1198,6 +1282,7 @@ class _MedicineModalState extends State<MedicineModal> {
     }
     setState(() {
       _reminderTime = time;
+      _inlineValidationError = null;
     });
   }
 
