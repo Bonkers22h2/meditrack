@@ -22,11 +22,18 @@ const String normalUserRole = 'normal_user';
 class MeditrackApp extends StatelessWidget {
   const MeditrackApp({super.key});
 
+  static const String startupRoute = '/startup';
+  static const String loginRoute = '/login';
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Meditrack',
       debugShowCheckedModeBanner: false,
+      routes: <String, WidgetBuilder>{
+        startupRoute: (BuildContext context) => const AppStartupScreen(),
+        loginRoute: (BuildContext context) => const MeditrackLoginScreen(),
+      },
       builder: (BuildContext context, Widget? child) {
         return ShowCaseWidget(
           onComplete: (int? index, GlobalKey key) {

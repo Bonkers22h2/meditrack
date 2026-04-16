@@ -357,6 +357,13 @@ class NotificationService {
     await Future.wait(cancelOperations);
   }
 
+  static Future<void> cancelAllNotifications() async {
+    if (!_initialized) {
+      await initialize();
+    }
+    await _plugin.cancelAll();
+  }
+
   /// CANCEL ALL NOTIFICATIONS FOR A MEDICINE (NEW METHOD)
   /// Used when deleting a medicine record
   static Future<void> cancelAllRemindersForMedicine({

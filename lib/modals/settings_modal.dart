@@ -1,7 +1,9 @@
 // modals/settings_modal.dart
 import 'package:flutter/material.dart';
+import 'package:meditrack/main.dart';
 import 'package:meditrack/services/notification_service.dart';
 import 'package:meditrack/tutorials/tutorial_preferences.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SettingsModal extends StatefulWidget {
   const SettingsModal({super.key});
@@ -15,6 +17,7 @@ class _SettingsModalState extends State<SettingsModal> {
   bool _isCheckingNotificationStatus = true;
   bool _isTestingEscalationSound = false;
   bool _isResettingTutorials = false;
+  bool _isLoggingOut = false;
 
   @override
   void initState() {
@@ -107,6 +110,72 @@ class _SettingsModalState extends State<SettingsModal> {
           _isResettingTutorials = false;
         });
       }
+    }
+  }
+
+  Future<void> _logoutAndResetApp() async {
+    if (_isLoggingOut) return;
+
+    final bool? shouldLogout = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Log out and reset app?'),
+          content: const Text(
+            'This will delete all saved data (medicines, stocks, patients, reminders, and settings) from this device. You will return to the role selection screen.',
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFB53434),
+              ),
+              child: const Text('Log Out'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldLogout != true || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _isLoggingOut = true;
+    });
+
+    try {
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
+      await NotificationService.cancelAllNotifications();
+
+      if (!mounted) {
+        return;
+      }
+
+      Navigator.of(context, rootNavigator: true).pushNamedAndRemoveUntil(
+        MeditrackApp.loginRoute,
+        (Route<dynamic> route) => false,
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Unable to complete logout reset right now.'),
+          ),
+        );
+      setState(() {
+        _isLoggingOut = false;
+      });
     }
   }
 
@@ -225,6 +294,28 @@ class _SettingsModalState extends State<SettingsModal> {
                         onPressed: _isResettingTutorials
                             ? null
                             : _resetTutorials,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        icon: const Icon(Icons.logout),
+                        label: Text(
+                          _isLoggingOut ? 'Logging out...' : 'Log Out',
+                        ),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFFB53434),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 14,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        onPressed: _isLoggingOut ? null : _logoutAndResetApp,
                       ),
                     ),
                   ],
