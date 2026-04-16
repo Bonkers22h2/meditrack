@@ -12,6 +12,7 @@ class ReportsScreen extends StatefulWidget {
     this.takenRemindersStorageKey = 'taken_reminders_v1',
     this.title = 'Adherence Report',
     this.onHelpPressed,
+    this.showTopActions = true,
   });
 
   final String? patientId;
@@ -19,6 +20,7 @@ class ReportsScreen extends StatefulWidget {
   final String takenRemindersStorageKey;
   final String title;
   final VoidCallback? onHelpPressed;
+  final bool showTopActions;
 
   @override
   State<ReportsScreen> createState() => _ReportsScreenState();
@@ -398,76 +400,82 @@ class _ReportsScreenState extends State<ReportsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    SizedBox(
-                      height: 40,
-                      child: Image.asset(
-                        'android/app/src/main/res/assets/icons (1).png',
-                        fit: BoxFit.contain,
+                if (widget.showTopActions) ...[
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      SizedBox(
+                        height: 40,
+                        child: Image.asset(
+                          'android/app/src/main/res/assets/icons (1).png',
+                          fit: BoxFit.contain,
+                        ),
                       ),
-                    ),
-                    Row(
-                      children: [
-                        Container(
-                          width: 52,
-                          height: 52,
-                          decoration: BoxDecoration(
-                            color: cardColor,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.04),
-                                blurRadius: 12,
-                                offset: const Offset(0, 5),
-                              ),
-                            ],
-                          ),
-                          child: IconButton(
-                            tooltip: 'Help Center',
-                            icon: Icon(
-                              Icons.help_outline,
-                              color: textDark,
-                              size: 24,
+                      Row(
+                        children: [
+                          Container(
+                            width: 52,
+                            height: 52,
+                            decoration: BoxDecoration(
+                              color: cardColor,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.04),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 5),
+                                ),
+                              ],
                             ),
-                            onPressed: widget.onHelpPressed,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Container(
-                          width: 52,
-                          height: 52,
-                          decoration: BoxDecoration(
-                            color: cardColor,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.04),
-                                blurRadius: 12,
-                                offset: const Offset(0, 5),
+                            child: IconButton(
+                              tooltip: 'Help Center',
+                              icon: Icon(
+                                Icons.help_outline,
+                                color: textDark,
+                                size: 24,
                               ),
-                            ],
+                              onPressed: widget.onHelpPressed,
+                            ),
                           ),
-                          child: IconButton(
-                            icon: Icon(Icons.settings, color: textDark, size: 24),
-                            onPressed: () {
-                              showModalBottomSheet(
-                                context: context,
-                                isScrollControlled: true,
-                                useSafeArea: true,
-                                backgroundColor: Colors.transparent,
-                                builder: (BuildContext context) =>
-                                    const SettingsModal(),
-                              );
-                            },
+                          const SizedBox(width: 10),
+                          Container(
+                            width: 52,
+                            height: 52,
+                            decoration: BoxDecoration(
+                              color: cardColor,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.04),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 5),
+                                ),
+                              ],
+                            ),
+                            child: IconButton(
+                              icon: Icon(
+                                Icons.settings,
+                                color: textDark,
+                                size: 24,
+                              ),
+                              onPressed: () {
+                                showModalBottomSheet(
+                                  context: context,
+                                  isScrollControlled: true,
+                                  useSafeArea: true,
+                                  backgroundColor: Colors.transparent,
+                                  builder: (BuildContext context) =>
+                                      const SettingsModal(),
+                                );
+                              },
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 26),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 26),
+                ],
                 Text(
                   widget.title,
                   style: TextStyle(

@@ -1372,23 +1372,49 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 12),
-          Text(
-            'Caregiver Reports',
-            style: TextStyle(
-              color: textDark,
-              fontSize: 24,
-              fontWeight: FontWeight.w600,
-              letterSpacing: -0.4,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Switch between patients to review adherence and missed doses.',
-            style: TextStyle(
-              color: textFaint,
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              SizedBox(
+                height: 40,
+                child: Image.asset(
+                  'android/app/src/main/res/assets/icons (1).png',
+                  fit: BoxFit.contain,
+                ),
+              ),
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: cardColor,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.03),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: IconButton(
+                  tooltip: 'Caregiver options',
+                  icon: Icon(
+                    Icons.settings_outlined,
+                    color: textLight,
+                    size: 24,
+                  ),
+                  onPressed: () {
+                    showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      useSafeArea: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (BuildContext context) => const SettingsModal(),
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
           Container(
@@ -1435,6 +1461,7 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
               patientLabel: selectedPatientName,
               takenRemindersStorageKey: 'patient_taken_reminders_v1',
               title: 'Adherence Report',
+              showTopActions: false,
             ),
           ),
         ],
