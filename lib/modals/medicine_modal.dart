@@ -1172,54 +1172,43 @@ class _MedicineModalState extends State<MedicineModal> {
       }
 
       bool hadSchedulingError = false;
-      const int batchSize = 3;
-      final List<Future<void>> batch = <Future<void>>[];
+      int processedCount = 0;
 
       for (final MedicineRecord record in records) {
         final String patientName =
             patientNameById[record.patientId ?? '']?.trim() ?? '';
 
-        batch.add(
-          Future<void>(() async {
-            try {
-              if (record.reminderStartDate != null &&
-                  record.reminderEndDate != null) {
-                await NotificationService.scheduleMedicineReminderRange(
-                  medicineCreatedAtMillis:
-                      record.createdAt.millisecondsSinceEpoch,
-                  medicineName: record.name,
-                  startDate: record.reminderStartDate!,
-                  endDate: record.reminderEndDate!,
-                  hour: record.specificTime!.hour,
-                  minute: record.specificTime!.minute,
-                  frequency: record.frequency,
-                  patientName: patientName,
-                  doseAmount: record.doseAmount,
-                );
-              } else if (record.specificTime != null) {
-                await NotificationService.scheduleMedicineReminder(
-                  medicineCreatedAtMillis:
-                      record.createdAt.millisecondsSinceEpoch,
-                  medicineName: record.name,
-                  scheduledAt: record.specificTime!,
-                  patientName: patientName,
-                  doseAmount: record.doseAmount,
-                );
-              }
-            } catch (_) {
-              hadSchedulingError = true;
-            }
-          }),
-        );
-
-        if (batch.length >= batchSize) {
-          await Future.wait(batch);
-          batch.clear();
+        try {
+          if (record.reminderStartDate != null &&
+              record.reminderEndDate != null) {
+            await NotificationService.scheduleMedicineReminderRange(
+              medicineCreatedAtMillis: record.createdAt.millisecondsSinceEpoch,
+              medicineName: record.name,
+              startDate: record.reminderStartDate!,
+              endDate: record.reminderEndDate!,
+              hour: record.specificTime!.hour,
+              minute: record.specificTime!.minute,
+              frequency: record.frequency,
+              patientName: patientName,
+              doseAmount: record.doseAmount,
+            );
+          } else if (record.specificTime != null) {
+            await NotificationService.scheduleMedicineReminder(
+              medicineCreatedAtMillis: record.createdAt.millisecondsSinceEpoch,
+              medicineName: record.name,
+              scheduledAt: record.specificTime!,
+              patientName: patientName,
+              doseAmount: record.doseAmount,
+            );
+          }
+        } catch (_) {
+          hadSchedulingError = true;
         }
-      }
 
-      if (batch.isNotEmpty) {
-        await Future.wait(batch);
+        processedCount += 1;
+        if (processedCount % 2 == 0) {
+          await Future<void>.delayed(Duration.zero);
+        }
       }
 
       if (hadSchedulingError && mounted) {

@@ -10,7 +10,9 @@ import 'package:timezone/timezone.dart' as tz;
 class NotificationService {
   NotificationService._();
 
-  static const int _rangeScheduleBatchSize = 14;
+  // Keep scheduling throughput modest to avoid frame drops on large ranges.
+  static const int _rangeScheduleBatchSize = 3;
+  static const int _rangeScheduleYieldEvery = 8;
 
   static final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
@@ -147,7 +149,7 @@ class NotificationService {
     final tz.TZDateTime nowTz = tz.TZDateTime.from(now, tz.local);
     int scheduledCount = 0;
     int idOffset = 0;
-    final List<Future<void>> batch = <Future<void>>[];
+    int scheduledSinceYield = 0;
 
     // Guard against accidentally scheduling an excessively large date span.
     while (!cursor.isAfter(normalizedEnd) && idOffset < 731) {
@@ -169,30 +171,28 @@ class NotificationService {
           now: nowTz,
         );
         if (scheduledDate != null) {
-          batch.add(
-            _scheduleEscalatingReminder(
-              medicineCreatedAtMillis: medicineCreatedAtMillis,
-              scheduledDate: scheduledDate,
-              medicineName: medicineName,
-              patientName: patientName,
-              doseAmount: doseAmount,
-            ),
+          await _scheduleEscalatingReminder(
+            medicineCreatedAtMillis: medicineCreatedAtMillis,
+            scheduledDate: scheduledDate,
+            medicineName: medicineName,
+            patientName: patientName,
+            doseAmount: doseAmount,
           );
           scheduledCount += 1;
+          scheduledSinceYield += 1;
 
-          if (batch.length >= _rangeScheduleBatchSize) {
-            await Future.wait(batch);
-            batch.clear();
+          if (scheduledCount % _rangeScheduleBatchSize == 0) {
+            // Yield so UI and input handlers can breathe during large saves.
+            await Future<void>.delayed(Duration.zero);
+          } else if (scheduledSinceYield >= _rangeScheduleYieldEvery) {
+            scheduledSinceYield = 0;
+            await Future<void>.delayed(Duration.zero);
           }
         }
       }
 
       idOffset += 1;
       cursor = cursor.add(const Duration(days: 1));
-    }
-
-    if (batch.isNotEmpty) {
-      await Future.wait(batch);
     }
 
     return scheduledCount;
@@ -466,7 +466,6 @@ class NotificationService {
       scheduledAt: scheduledDate,
     );
 
-    final List<Future<void>> scheduleOperations = <Future<void>>[];
     for (int attempt = 0; attempt < _totalReminderAttempts; attempt += 1) {
       final _NotificationContent content = _notificationContentForAttempt(
         attempt: attempt,
@@ -475,22 +474,24 @@ class NotificationService {
         doseAmount: doseAmount,
         scheduledDate: scheduledDate,
       );
-      scheduleOperations.add(
-        _zonedScheduleWithFallback(
-          notificationId: _notificationIdForAttempt(
-            reminderIdentity: reminderIdentity,
-            attempt: attempt,
-          ),
-          title: content.title,
-          body: content.body,
-          scheduledDate: scheduledDate.add(
-            Duration(minutes: _escalationInterval.inMinutes * attempt),
-          ),
-          notificationDetails: _notificationDetailsForAttempt(attempt),
+      await _zonedScheduleWithFallback(
+        notificationId: _notificationIdForAttempt(
+          reminderIdentity: reminderIdentity,
+          attempt: attempt,
         ),
+        title: content.title,
+        body: content.body,
+        scheduledDate: scheduledDate.add(
+          Duration(minutes: _escalationInterval.inMinutes * attempt),
+        ),
+        notificationDetails: _notificationDetailsForAttempt(attempt),
       );
+
+      // Prevent long uninterrupted loops when many reminders are queued.
+      if ((attempt + 1) % 2 == 0) {
+        await Future<void>.delayed(Duration.zero);
+      }
     }
-    await Future.wait(scheduleOperations);
   }
 
   static Future<void> _zonedScheduleWithFallback({
