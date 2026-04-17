@@ -115,8 +115,13 @@ class _MeditrackLoginScreenState extends State<MeditrackLoginScreen> {
   final List<IntroPopupPage> _introPages = const <IntroPopupPage>[
     IntroPopupPage(
       title: 'Welcome To MediTrack!',
-      description:
-          'Our goal is to make managing your medications as simple as possible. Instead of typing long medical names, we use icons, colors, and simple taps to help you stay on track. This short guide will walk you through the first few steps, so you feel comfortable using the app.',
+      topImageAsset: 'android/app/src/main/res/assets/icons (3).png',
+      description: 'Before you start, please do these first:',
+      steps: <String>[
+        'Turn on notifications.',
+        'Turn on alarms.',
+        'Turn off battery saver for better performance.',
+      ],
     ),
     IntroPopupPage(
       title: 'Choose Your Role',
@@ -133,13 +138,16 @@ class _MeditrackLoginScreenState extends State<MeditrackLoginScreen> {
           'You can update this flow later when full account features are added.',
     ),
     IntroPopupPage(
-      title: 'Adding a Family Member or Caregiver',
+      title: 'Dashboard Overview',
       description:
-          'You are the main user. If you have a family member or caregiver who helps you manage your meds, you can invite them in this app to help you.',
-      action:
-          'After creating an account. Tap “Invite Caregiver” and enter their email address. The app will send them an invitation.',
+          'MediTrack currently has two separate dashboards. There is no account linking or invite caregiver flow yet.',
+      steps: <String>[
+        'Caregiver dashboard: monitor reminders and medication status for assisted users.',
+        'Normal user dashboard: manage your own medication schedule and reminders.',
+        'Choose the role that matches your use case each time you start the app.',
+      ],
       note:
-          'Inviting a caregiver allows them to see if you missed a dose, but they cannot change your settings or see your password.',
+          'If features change in a future update, this guide will be updated.',
     ),
   ];
 
