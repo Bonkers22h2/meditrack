@@ -18,6 +18,7 @@ class NotificationService {
       FlutterLocalNotificationsPlugin();
 
   static bool _initialized = false;
+  static bool _canScheduleExactNotifications = true;
   static const int _escalationAttempts = 3;
   // After levels 1 and 2, keep the level 3 urgent reminder visible 3 times total.
   static const int _continuousLevel3Retries = 2;
@@ -522,29 +523,34 @@ class NotificationService {
     required tz.TZDateTime scheduledDate,
     required NotificationDetails notificationDetails,
   }) async {
-    try {
-      await _plugin.zonedSchedule(
-        notificationId,
-        title,
-        body,
-        scheduledDate,
-        notificationDetails,
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-      );
-    } catch (_) {
-      await _plugin.zonedSchedule(
-        notificationId,
-        title,
-        body,
-        scheduledDate,
-        notificationDetails,
-        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-      );
+    if (_canScheduleExactNotifications) {
+      try {
+        await _plugin.zonedSchedule(
+          notificationId,
+          title,
+          body,
+          scheduledDate,
+          notificationDetails,
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+        );
+        return;
+      } catch (_) {
+        _canScheduleExactNotifications = false;
+      }
     }
+
+    await _plugin.zonedSchedule(
+      notificationId,
+      title,
+      body,
+      scheduledDate,
+      notificationDetails,
+      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+    );
   }
 
   static Future<bool> areNotificationsEnabled() async {
@@ -580,7 +586,13 @@ class NotificationService {
           AndroidFlutterLocalNotificationsPlugin
         >();
     await androidPlatform?.requestNotificationsPermission();
-    await androidPlatform?.requestExactAlarmsPermission();
+    if (androidPlatform != null) {
+      final bool? requested = await androidPlatform
+          .requestExactAlarmsPermission();
+      final bool? canSchedule = await androidPlatform
+          .canScheduleExactNotifications();
+      _canScheduleExactNotifications = canSchedule ?? requested ?? true;
+    }
 
     final IOSFlutterLocalNotificationsPlugin? iosPlatform = _plugin
         .resolvePlatformSpecificImplementation<
