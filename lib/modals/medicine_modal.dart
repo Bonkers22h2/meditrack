@@ -1027,7 +1027,6 @@ class _MedicineModalState extends State<MedicineModal> {
     try {
       final DateTime now = DateTime.now();
       final List<MedicineRecord> recordsToSave = [];
-      final int remindersPerDay = (24 / validatedHours).round();
 
       // --- NEW FREQUENCY FORMATTING LOGIC ---
       final String formattedHours = validatedHours % 1 == 0
@@ -1057,49 +1056,77 @@ class _MedicineModalState extends State<MedicineModal> {
       }
       // ---------------------------------------
 
-      for (int i = 0; i < _selectedMedicines.length; i++) {
-        final DateTime createdAt = widget.initialMedicine != null && i == 0
-            ? widget.initialMedicine!.createdAt
-            : now.add(Duration(microseconds: i + 1));
+      if (widget.initialMedicine != null) {
+        final MedicineRecord initial = widget.initialMedicine!;
+        final DateTime baseDate =
+            _reminderStartDate ??
+            initial.reminderStartDate ??
+            initial.specificTime ??
+            now;
+        final DateTime updatedTime = DateTime(
+          baseDate.year,
+          baseDate.month,
+          baseDate.day,
+          _reminderTime!.hour,
+          _reminderTime!.minute,
+        );
 
-        for (int j = 0; j < (remindersPerDay > 0 ? remindersPerDay : 1); j++) {
-          final int intervalHour =
-              (_reminderTime!.hour +
-                  (j * (24 ~/ (remindersPerDay > 0 ? remindersPerDay : 1)))) %
-              24;
-          final DateTime baseDate = _reminderStartDate ?? now;
+        final MedicineRecord updatedRecord = MedicineRecord(
+          iconKey: _selectedIconKey,
+          patientId: widget.patientId ?? initial.patientId,
+          name: _selectedMedicines.first,
+          doseAmount: doseText,
+          frequency: freqText,
+          specificTime: updatedTime,
+          reminderStartDate: _reminderStartDate,
+          reminderEndDate: _reminderEndDate,
+          createdAt: initial.createdAt,
+        );
 
-          DateTime intervalTime = DateTime(
-            baseDate.year,
-            baseDate.month,
-            baseDate.day,
-            intervalHour,
-            _reminderTime!.minute,
-          );
-
-          recordsToSave.add(
-            MedicineRecord(
-              iconKey: _selectedIconKey,
-              patientId: widget.patientId ?? widget.initialMedicine?.patientId,
-              name: _selectedMedicines[i],
-              doseAmount: doseText,
-              frequency: freqText, // Used the new formatted text here
-              specificTime: intervalTime,
-              reminderStartDate: _reminderStartDate,
-              reminderEndDate: _reminderEndDate,
-              createdAt: createdAt.add(Duration(milliseconds: j)),
-            ),
-          );
-        }
-      }
-
-      if (widget.initialMedicine == null) {
-        await MedicineStorage.addMedicines(recordsToSave);
+        await MedicineStorage.updateMedicine(updatedRecord);
+        recordsToSave.add(updatedRecord);
       } else {
-        await MedicineStorage.updateMedicine(recordsToSave.first);
-        if (recordsToSave.length > 1) {
-          await MedicineStorage.addMedicines(recordsToSave.skip(1).toList());
+        final int remindersPerDay = (24 / validatedHours).round();
+        for (int i = 0; i < _selectedMedicines.length; i++) {
+          final DateTime createdAt = now.add(Duration(microseconds: i + 1));
+
+          for (
+            int j = 0;
+            j < (remindersPerDay > 0 ? remindersPerDay : 1);
+            j++
+          ) {
+            final int intervalHour =
+                (_reminderTime!.hour +
+                    (j * (24 ~/ (remindersPerDay > 0 ? remindersPerDay : 1)))) %
+                24;
+            final DateTime baseDate = _reminderStartDate ?? now;
+
+            final DateTime intervalTime = DateTime(
+              baseDate.year,
+              baseDate.month,
+              baseDate.day,
+              intervalHour,
+              _reminderTime!.minute,
+            );
+
+            recordsToSave.add(
+              MedicineRecord(
+                iconKey: _selectedIconKey,
+                patientId:
+                    widget.patientId ?? widget.initialMedicine?.patientId,
+                name: _selectedMedicines[i],
+                doseAmount: doseText,
+                frequency: freqText,
+                specificTime: intervalTime,
+                reminderStartDate: _reminderStartDate,
+                reminderEndDate: _reminderEndDate,
+                createdAt: createdAt.add(Duration(milliseconds: j)),
+              ),
+            );
+          }
         }
+
+        await MedicineStorage.addMedicines(recordsToSave);
       }
 
       if (mounted) {
