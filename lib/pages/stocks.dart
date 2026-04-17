@@ -223,7 +223,7 @@ class _StockScreenState extends State<StockScreen> {
                   SizedBox(
                     height: 40,
                     child: Image.asset(
-                      'android/app/src/main/res/assets/icons (1).png',
+                      'assets/images/icons (1).png',
                       fit: BoxFit.contain,
                     ),
                   ),

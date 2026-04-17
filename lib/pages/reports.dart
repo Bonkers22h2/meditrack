@@ -413,7 +413,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                       SizedBox(
                         height: 40,
                         child: Image.asset(
-                          'android/app/src/main/res/assets/icons (1).png',
+                          'assets/images/icons (1).png',
                           fit: BoxFit.contain,
                         ),
                       ),

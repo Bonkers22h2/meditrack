@@ -115,7 +115,7 @@ class _MeditrackLoginScreenState extends State<MeditrackLoginScreen> {
   final List<IntroPopupPage> _introPages = const <IntroPopupPage>[
     IntroPopupPage(
       title: 'Welcome To MediTrack!',
-      topImageAsset: 'android/app/src/main/res/assets/icons (3).png',
+      topImageAsset: 'assets/images/icons (3).png',
       description: 'Before you start, please do these first:',
       steps: <String>[
         'Turn on notifications.',
