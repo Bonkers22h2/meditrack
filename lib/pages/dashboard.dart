@@ -285,6 +285,46 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return int.tryParse(match.group(0)!) ?? 1;
   }
 
+  void _showDashboardSnackBar(
+    String message, {
+    Color background = const Color(0xFFEF6C00),
+    IconData icon = Icons.info_outline,
+  }) {
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          elevation: 10,
+          backgroundColor: background,
+          margin: const EdgeInsets.fromLTRB(18, 0, 18, 22),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+          duration: const Duration(seconds: 3),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(22),
+          ),
+          content: Row(
+            children: [
+              Icon(icon, color: Colors.white, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  message,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    height: 1.35,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+  }
+
   Future<void> _markReminderAsTaken(_ReminderInstance reminder) async {
     final DateTime today = DateTime.now();
     if (!_isSameDay(_selectedDate, today)) {
@@ -304,18 +344,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '❌ This medicine is expired. Cannot mark dose as taken.',
-            style: const TextStyle(color: Colors.white),
-          ),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
+      _showDashboardSnackBar(
+        'This medicine is expired. Cannot mark dose as taken.',
+        background: const Color(0xFFC62828),
+        icon: Icons.warning_amber_rounded,
       );
       return;
     }
@@ -330,17 +362,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
         if (!mounted) {
           return;
         }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Not enough stock for ${reminder.medicine.name}. Need $doseCount, available $availableStock.',
-            ),
-            backgroundColor: Colors.orange.shade800,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
+        _showDashboardSnackBar(
+          'Not enough stock for ${reminder.medicine.name}. Need $doseCount, available $availableStock.',
+          background: const Color(0xFFEF6C00),
+          icon: Icons.inventory_2_outlined,
         );
         return;
       }
@@ -356,10 +381,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
         if (!mounted) {
           return;
         }
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Unable to deduct stock. Please try again.'),
-          ),
+        _showDashboardSnackBar(
+          'Unable to deduct stock. Please try again.',
+          background: const Color(0xFFC62828),
+          icon: Icons.error_outline,
         );
         return;
       }
@@ -402,9 +427,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final String message = deducted
         ? 'Deducted $doseCount pill${doseCount == 1 ? '' : 's'} from ${reminder.medicine.name} stock.'
         : 'Reminder marked done.';
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    _showDashboardSnackBar(
+      message,
+      background: const Color(0xFF2E7D32),
+      icon: Icons.check_circle_outline,
+    );
   }
 
   Future<void> _openMedicineModal({bool startScheduleTutorial = false}) async {
