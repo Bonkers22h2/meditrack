@@ -19,8 +19,8 @@ class NotificationService {
 
   static bool _initialized = false;
   static const int _escalationAttempts = 3;
-  // After levels 1 and 2, keep the level 3 urgent reminder visible 5 times total.
-  static const int _continuousLevel3Retries = 4;
+  // After levels 1 and 2, keep the level 3 urgent reminder visible 3 times total.
+  static const int _continuousLevel3Retries = 2;
   static const int _totalReminderAttempts =
       _escalationAttempts + _continuousLevel3Retries;
   static const Duration _escalationInterval = Duration(minutes: 2);
@@ -487,6 +487,12 @@ class NotificationService {
         doseAmount: doseAmount,
         scheduledDate: scheduledDate,
       );
+
+      // Calculate delay: 0, 2, 4, 8, 12 minutes
+      final int delayMinutes = attempt <= 2
+          ? attempt * 2
+          : 4 + (attempt - 2) * 4;
+
       await _zonedScheduleWithFallback(
         notificationId: _notificationIdForAttempt(
           reminderIdentity: reminderIdentity,
@@ -494,9 +500,7 @@ class NotificationService {
         ),
         title: content.title,
         body: content.body,
-        scheduledDate: scheduledDate.add(
-          Duration(minutes: _escalationInterval.inMinutes * attempt),
-        ),
+        scheduledDate: scheduledDate.add(Duration(minutes: delayMinutes)),
         notificationDetails: _notificationDetailsForAttempt(
           attempt: attempt,
           title: content.title,

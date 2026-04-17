@@ -33,26 +33,6 @@ class MedicineIcons {
       label: 'Liquid',
       icon: Icons.local_drink_outlined,
     ),
-    MedicineIconOption(
-      key: 'heart',
-      label: 'Heart',
-      icon: Icons.favorite_outline,
-    ),
-    MedicineIconOption(
-      key: 'timer',
-      label: 'Timer',
-      icon: Icons.timer_outlined,
-    ),
-    MedicineIconOption(
-      key: 'sun',
-      label: 'Morning',
-      icon: Icons.wb_sunny_outlined,
-    ),
-    MedicineIconOption(
-      key: 'moon',
-      label: 'Night',
-      icon: Icons.dark_mode_outlined,
-    ),
   ];
 
   static IconData resolve(String? key) {
