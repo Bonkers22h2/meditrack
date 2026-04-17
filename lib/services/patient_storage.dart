@@ -76,4 +76,26 @@ class PatientStorage {
     patients.add(patient);
     await savePatients(patients);
   }
+
+  static Future<void> updatePatient(PatientRecord updatedPatient) async {
+    final List<PatientRecord> patients = await loadPatients();
+    final int index = patients.indexWhere(
+      (PatientRecord patient) =>
+          patient.createdAt.isAtSameMomentAs(updatedPatient.createdAt),
+    );
+
+    if (index >= 0) {
+      patients[index] = updatedPatient;
+      await savePatients(patients);
+    }
+  }
+
+  static Future<void> deletePatient(PatientRecord patientToDelete) async {
+    final List<PatientRecord> patients = await loadPatients();
+    patients.removeWhere(
+      (PatientRecord patient) =>
+          patient.createdAt.isAtSameMomentAs(patientToDelete.createdAt),
+    );
+    await savePatients(patients);
+  }
 }

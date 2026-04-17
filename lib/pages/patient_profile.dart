@@ -28,15 +28,260 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
   Set<String> _expiredMedicineNames = <String>{};
   bool _isLoadingReminders = true;
   DateTime _selectedDate = DateTime.now();
+  late PatientRecord _patient;
 
-  String get _patientId => widget.patient.createdAt.toIso8601String();
+  String get _patientId => _patient.createdAt.toIso8601String();
 
   @override
   void initState() {
     super.initState();
+    _patient = widget.patient;
     _loadReminders();
     _loadExpiredMedicineNames();
     _loadReminderCompletionState();
+  }
+
+  Future<void> _openEditPatientDialog() async {
+    final GlobalKey<FormState> formKey = GlobalKey<FormState>();
+    String fullName = _patient.fullName;
+    String ageText = _patient.age.toString();
+    String relationship = _patient.relationship;
+    String emergencyContactNumber = _patient.emergencyContactNumber;
+
+    final _PatientEditAction? action = await showDialog<_PatientEditAction>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: const Text('Edit Patient Profile'),
+          content: SingleChildScrollView(
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    initialValue: _patient.fullName,
+                    textCapitalization: TextCapitalization.words,
+                    decoration: const InputDecoration(labelText: 'Full Name'),
+                    onChanged: (String value) {
+                      fullName = value;
+                    },
+                    validator: (String? value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Full name is required';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    initialValue: _patient.age.toString(),
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Age'),
+                    onChanged: (String value) {
+                      ageText = value;
+                    },
+                    validator: (String? value) {
+                      final int? age = int.tryParse((value ?? '').trim());
+                      if (age == null || age <= 0) {
+                        return 'Enter a valid age';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    initialValue: _patient.relationship,
+                    textCapitalization: TextCapitalization.words,
+                    decoration: const InputDecoration(
+                      labelText: 'Relationship',
+                    ),
+                    onChanged: (String value) {
+                      relationship = value;
+                    },
+                    validator: (String? value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Relationship is required';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    initialValue: _patient.emergencyContactNumber,
+                    keyboardType: TextInputType.phone,
+                    decoration: const InputDecoration(
+                      labelText: 'Emergency Contact Number',
+                    ),
+                    onChanged: (String value) {
+                      emergencyContactNumber = value;
+                    },
+                    validator: (String? value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Emergency contact is required';
+                      }
+                      return null;
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(
+                  dialogContext,
+                ).pop(const _PatientEditAction.delete());
+              },
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFFC62828),
+              ),
+              child: const Text('Delete'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (!(formKey.currentState?.validate() ?? false)) {
+                  return;
+                }
+
+                Navigator.of(dialogContext).pop(
+                  _PatientEditAction.save(
+                    fullName: fullName.trim(),
+                    age: int.parse(ageText.trim()),
+                    relationship: relationship.trim(),
+                    emergencyContactNumber: emergencyContactNumber.trim(),
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF6E765D),
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (action == null) {
+      return;
+    }
+
+    if (action.deleteRequested) {
+      await Future<void>.delayed(Duration.zero);
+      await _confirmAndDeletePatient();
+      return;
+    }
+
+    final PatientRecord updatedPatient = PatientRecord(
+      fullName: action.fullName!,
+      age: action.age!,
+      relationship: action.relationship!,
+      emergencyContactNumber: action.emergencyContactNumber!,
+      createdAt: _patient.createdAt,
+    );
+
+    await PatientStorage.updatePatient(updatedPatient);
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _patient = updatedPatient;
+    });
+
+    _showPatientSnackBar(
+      'Patient profile updated.',
+      background: const Color(0xFF2E7D32),
+      icon: Icons.check_circle_outline,
+    );
+  }
+
+  Future<void> _confirmAndDeletePatient() async {
+    final bool? shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Delete Patient'),
+          content: Text(
+            'Delete ${_patient.fullName} and all linked reminders?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFC62828),
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldDelete != true) {
+      return;
+    }
+
+    final List<MedicineRecord> allMedicines =
+        await MedicineStorage.loadMedicines();
+    final List<MedicineRecord> linkedReminders = allMedicines
+        .where((MedicineRecord record) => record.patientId == _patientId)
+        .toList();
+
+    for (final MedicineRecord record in linkedReminders) {
+      final DateTime? specificTime = record.specificTime;
+      await NotificationService.cancelAllRemindersForMedicine(
+        medicineCreatedAtMillis: record.createdAt.millisecondsSinceEpoch,
+        reminderStartDate: record.reminderStartDate,
+        reminderEndDate: record.reminderEndDate,
+        reminderTime: specificTime == null
+            ? null
+            : TimeOfDay(hour: specificTime.hour, minute: specificTime.minute),
+      ).catchError((_) {});
+    }
+
+    final List<MedicineRecord> remaining = allMedicines
+        .where((MedicineRecord record) => record.patientId != _patientId)
+        .toList();
+
+    final Set<String> deletedReminderPrefixes = linkedReminders
+        .map((MedicineRecord record) => record.createdAt.toIso8601String())
+        .toSet();
+
+    _takenReminderKeys.removeWhere((String key) {
+      return deletedReminderPrefixes.any(
+        (String prefix) => key.startsWith('${prefix}_'),
+      );
+    });
+    _deductedReminderKeys.removeWhere((String key) {
+      return deletedReminderPrefixes.any(
+        (String prefix) => key.startsWith('${prefix}_'),
+      );
+    });
+    await _persistReminderCompletionState();
+
+    await MedicineStorage.saveMedicines(remaining);
+    await PatientStorage.deletePatient(_patient);
+
+    if (!mounted) {
+      return;
+    }
+    Navigator.of(context).pop(true);
   }
 
   Future<void> _loadExpiredMedicineNames() async {
@@ -508,6 +753,13 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
       appBar: AppBar(
         title: const Text('Patient Profile'),
         backgroundColor: Colors.transparent,
+        actions: [
+          IconButton(
+            tooltip: 'Edit patient profile',
+            onPressed: _openEditPatientDialog,
+            icon: const Icon(Icons.edit_outlined),
+          ),
+        ],
       ),
       body: SafeArea(
         child: Padding(
@@ -549,7 +801,7 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            widget.patient.fullName,
+                            _patient.fullName,
                             style: const TextStyle(
                               color: textDark,
                               fontSize: 18,
@@ -558,7 +810,7 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            '${widget.patient.age} years old',
+                            '${_patient.age} years old',
                             style: const TextStyle(
                               color: textLight,
                               fontSize: 13,
@@ -595,7 +847,7 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
                       child: _CompactInfoItem(
                         icon: Icons.people_outline,
                         label: 'Relationship',
-                        value: widget.patient.relationship,
+                        value: _patient.relationship,
                       ),
                     ),
                     Container(
@@ -607,7 +859,7 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
                       child: _CompactInfoItem(
                         icon: Icons.phone_outlined,
                         label: 'Emergency',
-                        value: widget.patient.emergencyContactNumber,
+                        value: _patient.emergencyContactNumber,
                       ),
                     ),
                   ],
@@ -852,4 +1104,26 @@ class _CompactInfoItem extends StatelessWidget {
       ),
     );
   }
+}
+
+class _PatientEditAction {
+  const _PatientEditAction.save({
+    required this.fullName,
+    required this.age,
+    required this.relationship,
+    required this.emergencyContactNumber,
+  }) : deleteRequested = false;
+
+  const _PatientEditAction.delete()
+    : deleteRequested = true,
+      fullName = null,
+      age = null,
+      relationship = null,
+      emergencyContactNumber = null;
+
+  final bool deleteRequested;
+  final String? fullName;
+  final int? age;
+  final String? relationship;
+  final String? emergencyContactNumber;
 }

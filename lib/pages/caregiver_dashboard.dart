@@ -392,8 +392,8 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
   }
 
   Future<void> _openPatientProfile(PatientRecord patient) async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
         builder: (BuildContext context) =>
             PatientProfileScreen(patient: patient),
       ),
@@ -403,6 +403,7 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
       return;
     }
     await Future.wait<void>(<Future<void>>[
+      _loadPatients(),
       _loadReminderCounts(),
       _loadReminderCompletionState(),
     ]);
@@ -1753,62 +1754,79 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
             ),
           ),
           const SizedBox(width: 10),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                patient.fullName,
-                style: TextStyle(
-                  color: textDark,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  patient.fullName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: textDark,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                '${patient.age} yrs',
-                style: TextStyle(
-                  color: textLight,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
+                const SizedBox(height: 2),
+                Text(
+                  '${patient.age} yrs',
+                  style: TextStyle(
+                    color: textLight,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(width: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-            decoration: BoxDecoration(
-              color: const Color(0xFFEAF3FF),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(
-              patient.relationship,
-              style: TextStyle(
-                color: textDark,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEAF3FF),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        patient.relationship,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: textDark,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE7EFE4),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '$reminderCount reminder${reminderCount == 1 ? '' : 's'}',
+                        style: TextStyle(
+                          color: textDark,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
           const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-            decoration: BoxDecoration(
-              color: const Color(0xFFE7EFE4),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(
-              '$reminderCount reminder${reminderCount == 1 ? '' : 's'}',
-              style: TextStyle(
-                color: textDark,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-          const Spacer(),
           Icon(Icons.chevron_right_rounded, color: textLight, size: 22),
         ],
       ),
