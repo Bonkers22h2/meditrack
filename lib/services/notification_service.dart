@@ -33,20 +33,25 @@ class NotificationService {
   static const String _level3Sound = 'reminder_level_3';
   static const String _notificationIcon = 'logo';
 
-  static const NotificationDetails _defaultNotificationDetails =
-      NotificationDetails(
-        android: AndroidNotificationDetails(
-          _defaultChannelId,
-          'Medicine Reminders',
-          channelDescription: 'Reminder notifications for medicine intake',
-          icon: _notificationIcon,
-          importance: Importance.max,
-          priority: Priority.high,
-          playSound: true,
-          sound: RawResourceAndroidNotificationSound(_level1Sound),
-        ),
-        iOS: DarwinNotificationDetails(),
-      );
+  static NotificationDetails _defaultNotificationDetailsForBody({
+    required String body,
+    String? title,
+  }) {
+    return NotificationDetails(
+      android: AndroidNotificationDetails(
+        _defaultChannelId,
+        'Medicine Reminders',
+        channelDescription: 'Reminder notifications for medicine intake',
+        icon: _notificationIcon,
+        importance: Importance.max,
+        priority: Priority.high,
+        playSound: true,
+        sound: RawResourceAndroidNotificationSound(_level1Sound),
+        styleInformation: BigTextStyleInformation(body, contentTitle: title),
+      ),
+      iOS: const DarwinNotificationDetails(),
+    );
+  }
 
   static Future<void> initialize() async {
     if (_initialized) {
@@ -292,7 +297,7 @@ class NotificationService {
       notificationId,
       title,
       body,
-      _defaultNotificationDetails,
+      _defaultNotificationDetailsForBody(body: body, title: title),
     );
   }
 
@@ -315,7 +320,10 @@ class NotificationService {
       title: title,
       body: body,
       scheduledDate: scheduledDate,
-      notificationDetails: _defaultNotificationDetails,
+      notificationDetails: _defaultNotificationDetailsForBody(
+        body: body,
+        title: title,
+      ),
     );
   }
 
@@ -331,13 +339,18 @@ class NotificationService {
     final tz.TZDateTime now = tz.TZDateTime.now(tz.local);
     for (int attempt = 0; attempt < _escalationAttempts; attempt += 1) {
       final int alertLevel = _alertLevelForAttempt(attempt);
+      final String testBody =
+          'This is a preview of reminder style $alertLevel. Attempt ${attempt + 1} of $_escalationAttempts.';
       await _zonedScheduleWithFallback(
         notificationId: baseNotificationId + attempt,
         title: 'Reminder Test',
-        body:
-            "This is a preview of reminder style $alertLevel. Attempt ${attempt + 1} of $_escalationAttempts.",
+        body: testBody,
         scheduledDate: now.add(initialDelay + (stepDelay * attempt)),
-        notificationDetails: _notificationDetailsForAttempt(attempt),
+        notificationDetails: _notificationDetailsForAttempt(
+          attempt: attempt,
+          title: 'Reminder Test',
+          body: testBody,
+        ),
       );
     }
   }
@@ -484,7 +497,11 @@ class NotificationService {
         scheduledDate: scheduledDate.add(
           Duration(minutes: _escalationInterval.inMinutes * attempt),
         ),
-        notificationDetails: _notificationDetailsForAttempt(attempt),
+        notificationDetails: _notificationDetailsForAttempt(
+          attempt: attempt,
+          title: content.title,
+          body: content.body,
+        ),
       );
 
       // Prevent long uninterrupted loops when many reminders are queued.
@@ -637,7 +654,11 @@ class NotificationService {
     );
   }
 
-  static NotificationDetails _notificationDetailsForAttempt(int attempt) {
+  static NotificationDetails _notificationDetailsForAttempt({
+    required int attempt,
+    required String title,
+    required String body,
+  }) {
     final int alertLevel = _alertLevelForAttempt(attempt);
     if (alertLevel == 1) {
       return NotificationDetails(
@@ -651,6 +672,7 @@ class NotificationService {
           playSound: true,
           sound: RawResourceAndroidNotificationSound(_level1Sound),
           enableVibration: true,
+          styleInformation: BigTextStyleInformation(body, contentTitle: title),
           vibrationPattern: Int64List.fromList(<int>[0, 250, 200, 250]),
         ),
         iOS: const DarwinNotificationDetails(),
@@ -669,6 +691,7 @@ class NotificationService {
           playSound: true,
           sound: RawResourceAndroidNotificationSound(_level2Sound),
           enableVibration: true,
+          styleInformation: BigTextStyleInformation(body, contentTitle: title),
           vibrationPattern: Int64List.fromList(<int>[
             0,
             350,
@@ -698,6 +721,7 @@ class NotificationService {
         category: AndroidNotificationCategory.alarm,
         fullScreenIntent: true,
         audioAttributesUsage: AudioAttributesUsage.alarm,
+        styleInformation: BigTextStyleInformation(body, contentTitle: title),
         vibrationPattern: Int64List.fromList(<int>[
           0,
           500,
