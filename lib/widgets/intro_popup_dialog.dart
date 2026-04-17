@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 
 class IntroPopupPage {
   final String title;
+  final IconData? topIcon;
+  final String? topImageAsset;
   final String? subtitle;
   final String description;
   final bool useQuoteBlockForIntroText;
@@ -13,6 +15,8 @@ class IntroPopupPage {
 
   const IntroPopupPage({
     required this.title,
+    this.topIcon,
+    this.topImageAsset,
     this.subtitle,
     required this.description,
     this.useQuoteBlockForIntroText = false,
@@ -104,201 +108,247 @@ class _IntroPopupDialogState extends State<IntroPopupDialog> {
                     return LayoutBuilder(
                       builder:
                           (BuildContext context, BoxConstraints constraints) {
-                            return SingleChildScrollView(
-                              child: ConstrainedBox(
-                                constraints: BoxConstraints(
-                                  minHeight: constraints.maxHeight,
-                                ),
-                                child: IntrinsicHeight(
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
+                            return Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.fromLTRB(
+                                14,
+                                16,
+                                14,
+                                16,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                              child: SingleChildScrollView(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (page.topImageAsset != null) ...[
                                       Center(
-                                        child: Text(
-                                          page.title,
-                                          textAlign: TextAlign.center,
-                                          style: theme.textTheme.headlineSmall
-                                              ?.copyWith(
-                                                fontWeight: FontWeight.w700,
-                                                color: const Color(0xFF1A1A1A),
-                                              ),
+                                        child: Container(
+                                          width: 150,
+                                          height: 150,
+                                          decoration: BoxDecoration(
+                                            color: Colors.white.withValues(
+                                              alpha: 0.82,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              28,
+                                            ),
+                                          ),
+                                          child: Padding(
+                                            padding: const EdgeInsets.all(12),
+                                            child: Image.asset(
+                                              page.topImageAsset!,
+                                              fit: BoxFit.contain,
+                                            ),
+                                          ),
                                         ),
                                       ),
                                       const SizedBox(height: 14),
-                                      if (page.useQuoteBlockForIntroText) ...[
-                                        Container(
-                                          width: double.infinity,
-                                          padding: const EdgeInsets.fromLTRB(
-                                            12,
-                                            10,
-                                            12,
-                                            10,
-                                          ),
+                                    ] else if (page.topIcon != null) ...[
+                                      Center(
+                                        child: Container(
+                                          width: 112,
+                                          height: 112,
                                           decoration: BoxDecoration(
-                                            color: const Color(0xFFF7F8F4),
-                                            borderRadius: BorderRadius.circular(
-                                              10,
+                                            color: Colors.white.withValues(
+                                              alpha: 0.82,
                                             ),
-                                            border: const Border(
-                                              left: BorderSide(
-                                                color: Color(0xFF6E765D),
-                                                width: 4,
-                                              ),
+                                            borderRadius: BorderRadius.circular(
+                                              28,
                                             ),
                                           ),
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              if (page.subtitle != null) ...[
-                                                Text(
-                                                  page.subtitle!,
-                                                  style: theme
-                                                      .textTheme
-                                                      .titleMedium
-                                                      ?.copyWith(
-                                                        fontStyle:
-                                                            FontStyle.italic,
-                                                        color: const Color(
-                                                          0xFF1A1A1A,
-                                                        ),
-                                                      ),
-                                                ),
-                                                const SizedBox(height: 8),
-                                              ],
+                                          child: Icon(
+                                            page.topIcon,
+                                            color: const Color(0xFF6E765D),
+                                            size: 62,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 14),
+                                    ],
+                                    Center(
+                                      child: Text(
+                                        page.title,
+                                        textAlign: TextAlign.center,
+                                        style: theme.textTheme.headlineSmall
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w700,
+                                              color: const Color(0xFF1A1A1A),
+                                            ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 14),
+                                    if (page.useQuoteBlockForIntroText) ...[
+                                      Container(
+                                        width: double.infinity,
+                                        padding: const EdgeInsets.fromLTRB(
+                                          12,
+                                          10,
+                                          12,
+                                          10,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFF7F8F4),
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
+                                          border: const Border(
+                                            left: BorderSide(
+                                              color: Color(0xFF6E765D),
+                                              width: 4,
+                                            ),
+                                          ),
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            if (page.subtitle != null) ...[
                                               Text(
-                                                page.description,
-                                                textAlign: TextAlign.justify,
+                                                page.subtitle!,
                                                 style: theme
                                                     .textTheme
-                                                    .bodyMedium
+                                                    .titleMedium
                                                     ?.copyWith(
-                                                      height: 1.45,
+                                                      fontStyle:
+                                                          FontStyle.italic,
                                                       color: const Color(
-                                                        0xFF565656,
+                                                        0xFF1A1A1A,
                                                       ),
                                                     ),
                                               ),
+                                              const SizedBox(height: 8),
                                             ],
-                                          ),
-                                        ),
-                                      ] else ...[
-                                        if (page.subtitle != null) ...[
-                                          Text(
-                                            page.subtitle!,
-                                            style: theme.textTheme.titleMedium
-                                                ?.copyWith(
-                                                  fontStyle: FontStyle.italic,
-                                                  color: const Color(
-                                                    0xFF1A1A1A,
+                                            Text(
+                                              page.description,
+                                              textAlign: TextAlign.justify,
+                                              style: theme.textTheme.bodyMedium
+                                                  ?.copyWith(
+                                                    height: 1.45,
+                                                    color: const Color(
+                                                      0xFF565656,
+                                                    ),
                                                   ),
-                                                ),
-                                          ),
-                                          const SizedBox(height: 8),
-                                        ],
-                                        Text(
-                                          page.description,
-                                          textAlign: TextAlign.justify,
-                                          style: theme.textTheme.bodyMedium
-                                              ?.copyWith(
-                                                height: 1.45,
-                                                color: const Color(0xFF565656),
-                                              ),
-                                        ),
-                                      ],
-                                      if (page.steps.isNotEmpty) ...[
-                                        const SizedBox(height: 12),
-                                        ...page.steps.asMap().entries.map((
-                                          MapEntry<int, String> entry,
-                                        ) {
-                                          final int stepNumber = entry.key + 1;
-                                          final String step = entry.value;
-
-                                          return Padding(
-                                            padding: const EdgeInsets.only(
-                                              bottom: 6,
                                             ),
-                                            child: Row(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Container(
-                                                  width: 20,
-                                                  alignment: Alignment.topLeft,
-                                                  child: Text(
-                                                    '$stepNumber.',
-                                                    style: theme
-                                                        .textTheme
-                                                        .bodyMedium
-                                                        ?.copyWith(
-                                                          color: const Color(
-                                                            0xFF6E765D,
-                                                          ),
-                                                          fontWeight:
-                                                              FontWeight.w700,
-                                                          height: 1.4,
-                                                        ),
-                                                  ),
-                                                ),
-                                                const SizedBox(width: 8),
-                                                Expanded(
-                                                  child: Text(
-                                                    step,
-                                                    style: theme
-                                                        .textTheme
-                                                        .bodyMedium
-                                                        ?.copyWith(
-                                                          color: const Color(
-                                                            0xFF565656,
-                                                          ),
-                                                          height: 1.4,
-                                                        ),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          );
-                                        }),
-                                      ],
-                                      if (page.action != null) ...[
-                                        const SizedBox(height: 12),
+                                          ],
+                                        ),
+                                      ),
+                                    ] else ...[
+                                      if (page.subtitle != null) ...[
                                         Text(
-                                          'Action: ${page.action!}',
-                                          style: theme.textTheme.bodyMedium
+                                          page.subtitle!,
+                                          style: theme.textTheme.titleMedium
                                               ?.copyWith(
-                                                height: 1.4,
-                                                fontWeight: FontWeight.w600,
+                                                fontStyle: FontStyle.italic,
                                                 color: const Color(0xFF1A1A1A),
                                               ),
                                         ),
-                                      ],
-                                      if (page.extra != null) ...[
                                         const SizedBox(height: 8),
-                                        Text(
-                                          page.extra!,
-                                          style: theme.textTheme.bodyMedium
-                                              ?.copyWith(
-                                                height: 1.4,
-                                                color: const Color(0xFF565656),
-                                              ),
-                                        ),
                                       ],
-                                      if (page.note != null) ...[
-                                        const SizedBox(height: 10),
-                                        Text(
-                                          'Note: ${page.note!}',
-                                          style: theme.textTheme.bodySmall
-                                              ?.copyWith(
-                                                height: 1.45,
-                                                color: const Color(0xFF565656),
-                                                fontStyle: FontStyle.italic,
-                                              ),
-                                        ),
-                                      ],
+                                      Text(
+                                        page.description,
+                                        textAlign: TextAlign.justify,
+                                        style: theme.textTheme.bodyMedium
+                                            ?.copyWith(
+                                              height: 1.45,
+                                              color: const Color(0xFF565656),
+                                            ),
+                                      ),
                                     ],
-                                  ),
+                                    if (page.steps.isNotEmpty) ...[
+                                      const SizedBox(height: 12),
+                                      ...page.steps.asMap().entries.map((
+                                        MapEntry<int, String> entry,
+                                      ) {
+                                        final int stepNumber = entry.key + 1;
+                                        final String step = entry.value;
+
+                                        return Padding(
+                                          padding: const EdgeInsets.only(
+                                            bottom: 6,
+                                          ),
+                                          child: Row(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Container(
+                                                width: 20,
+                                                alignment: Alignment.topLeft,
+                                                child: Text(
+                                                  '$stepNumber.',
+                                                  style: theme
+                                                      .textTheme
+                                                      .bodyMedium
+                                                      ?.copyWith(
+                                                        color: const Color(
+                                                          0xFF6E765D,
+                                                        ),
+                                                        fontWeight:
+                                                            FontWeight.w700,
+                                                        height: 1.4,
+                                                      ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                                child: Text(
+                                                  step,
+                                                  style: theme
+                                                      .textTheme
+                                                      .bodyMedium
+                                                      ?.copyWith(
+                                                        color: const Color(
+                                                          0xFF565656,
+                                                        ),
+                                                        height: 1.4,
+                                                      ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      }),
+                                    ],
+                                    if (page.action != null) ...[
+                                      const SizedBox(height: 12),
+                                      Text(
+                                        'Action: ${page.action!}',
+                                        style: theme.textTheme.bodyMedium
+                                            ?.copyWith(
+                                              height: 1.4,
+                                              fontWeight: FontWeight.w600,
+                                              color: const Color(0xFF1A1A1A),
+                                            ),
+                                      ),
+                                    ],
+                                    if (page.extra != null) ...[
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        page.extra!,
+                                        style: theme.textTheme.bodyMedium
+                                            ?.copyWith(
+                                              height: 1.4,
+                                              color: const Color(0xFF565656),
+                                            ),
+                                      ),
+                                    ],
+                                    if (page.note != null) ...[
+                                      const SizedBox(height: 10),
+                                      Text(
+                                        'Note: ${page.note!}',
+                                        style: theme.textTheme.bodySmall
+                                            ?.copyWith(
+                                              height: 1.45,
+                                              color: const Color(0xFF565656),
+                                              fontStyle: FontStyle.italic,
+                                            ),
+                                      ),
+                                    ],
+                                  ],
                                 ),
                               ),
                             );
