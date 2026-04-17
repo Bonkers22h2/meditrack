@@ -340,7 +340,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (!mounted) {
       return;
     }
-    if (_expiredMedicineNames.contains(normalizedName)) {
+    final bool isExpiredInStock = await StockStorage.isMedicineExpired(
+      medicineName: reminder.medicine.name,
+    );
+    if (!mounted) {
+      return;
+    }
+    if (_expiredMedicineNames.contains(normalizedName) || isExpiredInStock) {
       if (!mounted) {
         return;
       }
@@ -1008,12 +1014,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     for (final medicine in _medicines) {
       // Skip medicines without time info
       if (medicine.specificTime == null) continue;
-
-      final String normalizedMedicineName = medicine.name.trim().toLowerCase();
-      if (normalizedMedicineName.isNotEmpty &&
-          _expiredMedicineNames.contains(normalizedMedicineName)) {
-        continue;
-      }
 
       // Respect selected weekdays from frequency text (e.g. "on Sun, Tue").
       if (!_isScheduledOnWeekday(medicine.frequency, selectedDateOnly)) {

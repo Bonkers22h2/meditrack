@@ -438,8 +438,15 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
     }
 
     final String normalizedMedicineName = reminder.name.trim().toLowerCase();
-    if (normalizedMedicineName.isNotEmpty &&
-        _expiredMedicineNames.contains(normalizedMedicineName)) {
+    final bool isExpiredInStock = await StockStorage.isMedicineExpired(
+      medicineName: reminder.name,
+    );
+    if (!mounted) {
+      return;
+    }
+    if ((normalizedMedicineName.isNotEmpty &&
+            _expiredMedicineNames.contains(normalizedMedicineName)) ||
+        isExpiredInStock) {
       if (!mounted) {
         return;
       }
@@ -569,12 +576,6 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
 
     for (final MedicineRecord reminder in _reminders) {
       if (reminder.specificTime == null) {
-        continue;
-      }
-
-      final String normalizedMedicineName = reminder.name.trim().toLowerCase();
-      if (normalizedMedicineName.isNotEmpty &&
-          _expiredMedicineNames.contains(normalizedMedicineName)) {
         continue;
       }
 

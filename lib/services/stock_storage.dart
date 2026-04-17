@@ -175,6 +175,25 @@ class StockStorage {
     return stocks[index].currentStock;
   }
 
+  static Future<bool> isMedicineExpired({required String medicineName}) async {
+    final String normalizedName = medicineName.trim().toLowerCase();
+    if (normalizedName.isEmpty) {
+      return false;
+    }
+
+    final List<StockRecord> stocks = await loadStocks();
+    final int index = stocks.indexWhere(
+      (StockRecord stock) =>
+          stock.medicineName.trim().toLowerCase() == normalizedName,
+    );
+
+    if (index < 0) {
+      return false;
+    }
+
+    return stocks[index].isExpired;
+  }
+
   static Future<bool> deductStockForMedicine({
     required String medicineName,
     required int amount,
@@ -199,6 +218,9 @@ class StockStorage {
     }
 
     final StockRecord existing = stocks[index];
+    if (existing.isExpired || existing.currentStock < amount) {
+      return false;
+    }
     final int updatedStock = max(0, existing.currentStock - amount);
     stocks[index] = StockRecord(
       iconKey: existing.iconKey,

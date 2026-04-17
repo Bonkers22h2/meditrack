@@ -207,11 +207,6 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
       if (patientId == null || patientId.isEmpty) {
         continue;
       }
-      final String normalizedMedicineName = record.name.trim().toLowerCase();
-      if (normalizedMedicineName.isNotEmpty &&
-          _expiredMedicineNames.contains(normalizedMedicineName)) {
-        continue;
-      }
       patientMedicines.add(record);
       counts[patientId] = (counts[patientId] ?? 0) + 1;
     }
@@ -538,8 +533,15 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
     final String normalizedMedicineName = reminder.medicine.name
         .trim()
         .toLowerCase();
-    if (normalizedMedicineName.isNotEmpty &&
-        _expiredMedicineNames.contains(normalizedMedicineName)) {
+    final bool isExpiredInStock = await StockStorage.isMedicineExpired(
+      medicineName: reminder.medicine.name,
+    );
+    if (!mounted) {
+      return;
+    }
+    if ((normalizedMedicineName.isNotEmpty &&
+            _expiredMedicineNames.contains(normalizedMedicineName)) ||
+        isExpiredInStock) {
       if (!mounted) {
         return;
       }
@@ -704,12 +706,6 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
 
     for (final MedicineRecord medicine in _patientMedicines) {
       if (medicine.specificTime == null) {
-        continue;
-      }
-
-      final String normalizedMedicineName = medicine.name.trim().toLowerCase();
-      if (normalizedMedicineName.isNotEmpty &&
-          _expiredMedicineNames.contains(normalizedMedicineName)) {
         continue;
       }
 
